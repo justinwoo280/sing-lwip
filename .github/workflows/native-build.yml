@@ -37,6 +37,7 @@ jobs:
       - name: Check tooling and generated sources
         run: |
           test -z "$(gofmt -l .)"
+          go run ./cmd/build-lwip sync-lwip --check --remote
           go vet ./cmd/build-lwip
           go test ./cmd/build-lwip
           go run ./cmd/build-lwip generate --check

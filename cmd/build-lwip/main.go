@@ -24,6 +24,7 @@ func runCLI(args []string) error {
 
 Commands:
   generate           Generate cgo compilation units and source fingerprints
+  sync-lwip          Fetch or verify the locked lwIP fork commit
   build              Build and package a target's native libraries
   windows            Build an MSVC DLL using Clang/LLD and an xwin SDK
   zig-cc             Adapt Go's MIPS compiler flags for Zig (SING_LWIP_CC)
@@ -49,6 +50,8 @@ Use <command> --help for command options.`)
 	switch flags.Arg(0) {
 	case "generate":
 		return generateCommand(*root, flags.Args()[1:])
+	case "sync-lwip":
+		return syncSourceCommand(*root, flags.Args()[1:])
 	case "build":
 		return buildCommand(*root, flags.Args()[1:])
 	case "windows":
@@ -79,7 +82,7 @@ func sourceRoot(path string) (string, error) {
 	}
 	for {
 		if _, err := os.Stat(filepath.Join(path, "bridge.h")); err == nil {
-			if _, err := os.Stat(filepath.Join(path, "third_party", "lwip", "src")); err == nil {
+			if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil {
 				return path, nil
 			}
 		}

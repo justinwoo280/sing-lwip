@@ -1,11 +1,16 @@
 {
   "abi": 2,
-  "version": "dabef7847384",
+  "version": "1d26732af3bb",
   "target": "linux/mips64le",
   "libc": "gnu",
   "purego": false,
   "purego_requires_cgo": false,
-  "source_revision": "dabef7847384940eb8e06d6f539aa242c36cc7ad",
+  "source_revision": "1d26732af3bb3d586d9bc62e2469e5678a284180",
+  "lwip_source": {
+    "repository": "https://github.com/justinwoo280/lwip.git",
+    "revision": "02541e94fc3b0d4cbd0db33d7c610bd7f1b1086d",
+    "tree_sha256": "8d432409ade489625ec38eac5e8e17bad5e61209772a1d521674885156186821"
+  },
   "native_source_sha256": "46c800d90d992106d7f6ec282c2fba8d6a587df663defb423fa3d7f55fbf3a9c",
   "compiler": "clang version 20.1.2 (https://github.com/ziglang/zig-bootstrap 7ef74e656cf8ddbd6bf891a8475892aa1afa6891)",
   "files": {

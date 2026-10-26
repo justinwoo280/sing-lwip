@@ -44,6 +44,10 @@ func publishCommand(root string, args []string) error {
 	if status != "" {
 		return fmt.Errorf("commit source changes before publishing: %s", status)
 	}
+	source, err := verifyLWIPSource(root)
+	if err != nil {
+		return err
+	}
 	fingerprint, err := nativeFingerprint(root)
 	if err != nil {
 		return err
@@ -52,7 +56,7 @@ func publishCommand(root string, args []string) error {
 	if *expected != "" {
 		ids = strings.Split(*expected, ",")
 	}
-	builds, err := loadBuilds(root, *artifacts, head, fingerprint, ids)
+	builds, err := loadBuilds(root, *artifacts, head, fingerprint, ids, source)
 	if err != nil {
 		return err
 	}
@@ -161,12 +165,13 @@ func publishCommand(root string, args []string) error {
 		}
 	}
 	index := struct {
-		ABI              int      `json:"abi"`
-		SourceCommit     string   `json:"source_commit"`
-		LibrariesCommit  string   `json:"libraries_commit"`
-		LibrariesVersion string   `json:"libraries_version"`
-		Targets          []string `json:"targets"`
-	}{2, head, librariesCommit, version, ids}
+		ABI              int        `json:"abi"`
+		SourceCommit     string     `json:"source_commit"`
+		LibrariesCommit  string     `json:"libraries_commit"`
+		LibrariesVersion string     `json:"libraries_version"`
+		LWIPSource       sourceLock `json:"lwip_source"`
+		Targets          []string   `json:"targets"`
+	}{2, head, librariesCommit, version, source, ids}
 	data, err := json.MarshalIndent(index, "", "  ")
 	if err != nil {
 		return err
@@ -219,7 +224,7 @@ func checkSourceBranch(root, branch, head string) error {
 	return nil
 }
 
-func loadBuilds(root, artifacts, revision, fingerprint string, expected []string) ([]nativeBuild, error) {
+func loadBuilds(root, artifacts, revision, fingerprint string, expected []string, source sourceLock) ([]nativeBuild, error) {
 	wanted := make(map[string]bool)
 	for _, id := range expected {
 		if wanted[id] || id == "" {
@@ -243,8 +248,8 @@ func loadBuilds(root, artifacts, revision, fingerprint string, expected []string
 		if err := json.Unmarshal(data, &meta); err != nil {
 			return err
 		}
-		if meta.ABI != 2 || meta.SourceRevision != revision || meta.NativeSourceSHA256 != fingerprint {
-			return fmt.Errorf("%s: stale source revision/fingerprint or incompatible ABI", path)
+		if meta.ABI != 2 || meta.SourceRevision != revision || meta.NativeSourceSHA256 != fingerprint || meta.LWIPSource != source {
+			return fmt.Errorf("%s: stale binding/lwIP revision or fingerprint, or incompatible ABI", path)
 		}
 		t, err := parseTarget(meta.Target)
 		if err != nil {

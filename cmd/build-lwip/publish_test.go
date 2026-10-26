@@ -99,6 +99,16 @@ func TestPublishPinnedGraphAndHistory(t *testing.T) {
 	for _, name := range []string{"bridge.h", "lwipopts.h", "third_party/lwip/src/fixture.h", "LICENSE", "third_party/lwip/LICENSE"} {
 		write(filepath.Join(root, name), "/* fixture */\n")
 	}
+	snapshot, err := readSourceSnapshot(filepath.Join(root, "third_party/lwip"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := sourceLock{"https://github.com/example/lwip.git", strings.Repeat("a", 40), sourceTreeHash(snapshot)}
+	lockData, err := json.Marshal(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(filepath.Join(root, sourceLockFile), string(lockData))
 	git(root, "add", ".")
 	git(root, "commit", "-m", "source")
 	id := "linux_" + runtime.GOARCH + "_gnu"
@@ -116,7 +126,7 @@ func TestPublishPinnedGraphAndHistory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		meta := manifest{ABI: 2, Target: "linux/" + runtime.GOARCH, Libc: "gnu", SourceRevision: head, NativeSourceSHA256: fingerprint, Files: map[string]string{}}
+		meta := manifest{ABI: 2, Target: "linux/" + runtime.GOARCH, Libc: "gnu", SourceRevision: head, LWIPSource: source, NativeSourceSHA256: fingerprint, Files: map[string]string{}}
 		write(filepath.Join(artifacts, "libsing-lwip.a"), "!<arch>\n")
 		for _, pair := range [][2]string{{"bridge.h", "bridge.h"}, {"LICENSE", "LICENSE"}, {"third_party/lwip/LICENSE", "LWIP-LICENSE"}} {
 			if err := copyFile(filepath.Join(root, pair[0]), filepath.Join(artifacts, pair[1])); err != nil {
@@ -139,12 +149,27 @@ func TestPublishPinnedGraphAndHistory(t *testing.T) {
 		if strings.Contains(mod, "replace") || !strings.Contains(mod, "example.com/sing-lwip/lib/"+id+" v0.0.0-") {
 			t.Fatalf("unpublished or unpinned dependency in go.mod: %s", mod)
 		}
+		var index struct {
+			LWIPSource sourceLock `json:"lwip_source"`
+		}
+		if err := json.Unmarshal([]byte(git(root, "show", published+":native-build.json")), &index); err != nil || index.LWIPSource != source {
+			t.Fatalf("published lwIP provenance mismatch: %v, %v", index, err)
+		}
 		if previous != "" {
 			git(root, "merge-base", "--is-ancestor", previous, published)
 		}
 		if git(root, "rev-parse", "HEAD") != head || git(root, "status", "--porcelain") != "" {
 			t.Fatal("publisher changed source worktree")
 		}
+		// A different lwIP commit must be rejected even with matching binary hashes.
+		wrongSource := meta
+		wrongSource.LWIPSource.Revision = strings.Repeat("b", 40)
+		wrongData, _ := json.Marshal(wrongSource)
+		write(filepath.Join(artifacts, "manifest.json"), string(wrongData))
+		if err := publishCommand(root, []string{"--artifacts", artifacts, "--expected", id}); err == nil {
+			t.Fatal("accepted a different lwIP source revision")
+		}
+		write(filepath.Join(artifacts, "manifest.json"), string(data))
 		// Corrupt artifacts must be rejected without advancing the published ref.
 		write(filepath.Join(artifacts, "libsing-lwip.a"), "corrupt")
 		if err := publishCommand(root, []string{"--artifacts", artifacts, "--expected", id}); err == nil {

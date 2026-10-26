@@ -21,6 +21,7 @@ type manifest struct {
 	Purego             bool              `json:"purego"`
 	PuregoRequiresCgo  bool              `json:"purego_requires_cgo"`
 	SourceRevision     string            `json:"source_revision,omitempty"`
+	LWIPSource         sourceLock        `json:"lwip_source"`
 	NativeSourceSHA256 string            `json:"native_source_sha256"`
 	Compiler           string            `json:"compiler"`
 	CC                 string            `json:"cc,omitempty"`
@@ -43,6 +44,10 @@ func buildCommand(root string, args []string) error {
 		return err
 	}
 	t, err := parseTarget(*name)
+	if err != nil {
+		return err
+	}
+	source, err := verifyLWIPSource(root)
 	if err != nil {
 		return err
 	}
@@ -170,7 +175,7 @@ func buildCommand(root string, args []string) error {
 	}
 	revision, _ := output(root, []string{"git"}, "rev-parse", "HEAD")
 	meta := manifest{ABI: 2, Version: *version, Target: t.Name, Purego: t.purego() && !*staticOnly,
-		PuregoRequiresCgo: t.GOOS == "android", SourceRevision: revision, NativeSourceSHA256: fingerprint,
+		PuregoRequiresCgo: t.GOOS == "android", SourceRevision: revision, LWIPSource: source, NativeSourceSHA256: fingerprint,
 		Compiler: strings.Split(compilerVersion, "\n")[0], Files: make(map[string]string)}
 	if t.GOOS == "linux" {
 		meta.Libc = *libc
