@@ -20,5 +20,5 @@ runs:
         path: |
           .cache/go-mod
           .cache/go-build
-        key: go-${{ runner.os }}-${{ runner.arch }}-${{ inputs.target }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('*.go', '*.c', '*.h', 'cmd/**/*.go', 'third_party/lwip/src/**', 'go.mod', 'go.sum') }}
+        key: go-${{ runner.os }}-${{ runner.arch }}-${{ inputs.target }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('*.go', '*.c', '*.h', 'cmd/**/*.go', 'third_party/lwip/src/**', 'third_party/lwip.lock.json', 'go.mod', 'go.sum') }}
         restore-keys: go-${{ runner.os }}-${{ runner.arch }}-${{ inputs.target }}-${{ steps.go.outputs.go-version }}-

@@ -5,6 +5,9 @@
 
 Go bindings for [HEV lwIP](https://github.com/heiher/lwip), with CGO and PureGo backends for transparent packet processing.
 
+Native fixes are maintained in [justinwoo280/lwip](https://github.com/justinwoo280/lwip).
+The [source lock](third_party/lwip.lock.json) pins the exact fork commit; the Go synchronizer imports its sources for CGO builds.
+
 sing-lwip accepts IPv4/IPv6 packets and exposes TCP streams and UDP datagrams. The application supplies packet I/O,
 connection routing and upstream dialing. It is independent of sing-tun and sing-box; those projects can use it as a backend.
 
@@ -191,6 +194,7 @@ The [native build workflow](.github/workflows/native-build.yml) follows this flo
 
 ```text
 main / dev push
+  ├── fetch and verify the locked lwIP fork commit
   ├── validate generated sources and publisher tests
   ├── build the platform/libc matrix
   ├── run native or QEMU tests where available
@@ -202,7 +206,7 @@ main / dev push
 ```
 
 Pull requests build and test without publishing. The output branches do not trigger another native build.
-Publishing appends normal commits, validates the module graph locally, checks every artifact's source fingerprint,
+Publishing appends normal commits, validates the module graph locally, checks every artifact's lwIP fork revision, source fingerprint,
 ABI and hashes, and pushes the complete result once. Missing targets or failed jobs prevent publication.
 An outdated workflow cannot publish after its source branch has moved.
 
@@ -235,8 +239,15 @@ shared library is actually loaded. Tests operate on in-memory packets; they do n
 Native regressions require an ASan/UBSan/LSan-capable C compiler. The ABI fixture checks full-width handles,
 pointer/length arguments and 32-bit calling conventions.
 
-After modifying vendored C sources or headers, run `go run ./cmd/build-lwip generate` to refresh the cgo source fingerprints.
-Upstream provenance and the independent UDP, fragment-isolation and GSO patch split are documented in
+Update native code in the lwIP fork, then import the resulting commit:
+
+```sh
+go run ./cmd/build-lwip sync-lwip --revision <full-commit-sha>
+go run ./cmd/build-lwip sync-lwip --check --remote
+```
+
+Synchronization updates the source lock, bundled snapshot and CGO source fingerprints together.
+Fork commits and the independent UDP, fragment-isolation and GSO changes are documented in
 [third_party/README.md](third_party/README.md).
 
 ## License
