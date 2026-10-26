@@ -1,0 +1,24 @@
+name: Go with target-aware cache
+description: Cache Go modules and build outputs independently for each native target
+inputs:
+  go-version:
+    description: Go toolchain version
+    default: '1.26.x'
+  target:
+    description: Cache namespace for this target or tooling job
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v5
+      id: go
+      with:
+        go-version: ${{ inputs.go-version }}
+        cache: false
+    - uses: actions/cache@v4
+      with:
+        path: |
+          .cache/go-mod
+          .cache/go-build
+        key: go-${{ runner.os }}-${{ runner.arch }}-${{ inputs.target }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('*.go', '*.c', '*.h', 'cmd/**/*.go', 'third_party/lwip/src/**', 'go.mod', 'go.sum') }}
+        restore-keys: go-${{ runner.os }}-${{ runner.arch }}-${{ inputs.target }}-${{ steps.go.outputs.go-version }}-

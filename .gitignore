@@ -1,0 +1,13 @@
+*.so
+*.dylib
+*.dll
+*.a
+*.o
+*.test
+*.exe
+/dist/
+/artifacts/
+/.cache/
+/lib/
+/prebuilt_*.go
+/toolchains/

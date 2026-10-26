@@ -1,0 +1,408 @@
+name: Native build
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+env:
+  GOMAXPROCS: '2'
+  GOWORK: 'off'
+  GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
+  GOCACHE: ${{ github.workspace }}/.cache/go-build
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      linux: ${{ steps.matrix.outputs.linux }}
+      windows: ${{ steps.matrix.outputs.windows }}
+      apple: ${{ steps.matrix.outputs.apple }}
+      android: ${{ steps.matrix.outputs.android }}
+      freebsd: ${{ steps.matrix.outputs.freebsd }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go
+        with:
+          target: plan
+      - name: Check tooling and generated sources
+        run: |
+          test -z "$(gofmt -l .)"
+          go vet ./cmd/build-lwip
+          go test ./cmd/build-lwip
+          go run ./cmd/build-lwip generate --check
+      - name: Build matrices
+        id: matrix
+        run: |
+          for group in linux windows apple android freebsd; do
+            echo "$group=$(go run ./cmd/build-lwip matrix --group "$group")" >> "$GITHUB_OUTPUT"
+          done
+
+  go-compat:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.24.x', '1.25.x']
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go
+        with:
+          go-version: ${{ matrix.go }}
+          target: compatibility
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: '0.15.2'
+          cache-key: lwip-go-compat-${{ matrix.go }}
+      - name: Check source and publisher compatibility
+        run: |
+          go version
+          go test ./...
+          go run ./cmd/build-lwip generate --check
+      - name: Install ARMv7 runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libc6-armhf-cross qemu-user
+      - name: Check ARMv7 CGO and PureGo
+        env:
+          GOARM: '7'
+        run: |
+          go run ./cmd/build-lwip build --target linux/arm \
+            --cc 'zig cc -target arm-linux-gnueabihf.2.17' --ar 'zig ar' \
+            --output dist/compat --tests
+          qemu-arm -L /usr/arm-linux-gnueabihf dist/compat/cgo.test -test.v
+          SING_LWIP_LIBRARY="$PWD/dist/compat/libsing-lwip.so" \
+          SING_LWIP_ABI_FIXTURE="$PWD/dist/compat/abi-fixture.so" \
+            qemu-arm -L /usr/arm-linux-gnueabihf dist/compat/purego.test -test.v
+
+  linux:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.linux) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go
+        with:
+          target: linux-${{ matrix.arch }}
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: '0.15.2'
+          cache-key: lwip-linux-${{ matrix.arch }}
+      - name: Install runtime sysroots
+        if: matrix.packages != ''
+        env:
+          PACKAGES: ${{ matrix.packages }}
+        run: |
+          sudo apt-get update
+          read -r -a packages <<< "$PACKAGES"
+          sudo apt-get install -y --no-install-recommends "${packages[@]}"
+      - name: Build and test glibc and musl
+        env:
+          ARCH: ${{ matrix.arch }}
+          CPU: ${{ matrix.cpu }}
+          GNU_ABI: ${{ matrix.gnu }}
+          MUSL: ${{ matrix.musl }}
+          QEMU: ${{ matrix.qemu }}
+          SYSROOT: ${{ matrix.sysroot }}
+          GOARM: '7'
+        run: |
+          for libc in gnu musl; do
+            if [ "$libc" = musl ] && [ "$MUSL" != true ]; then continue; fi
+            out="dist/linux_${ARCH}_${libc}"
+            abi="$GNU_ABI"
+            extra=()
+            if [ "$libc" = musl ]; then
+              abi=musl
+              if [ "$ARCH" = arm ]; then abi=musleabihf; fi
+              extra+=(--static-only)
+            fi
+            cc="zig cc -target $CPU-linux-$abi"
+            go run ./cmd/build-lwip build --target "linux/$ARCH" --libc "$libc" \
+              --cc "$cc" --ar 'zig ar' --output "$out" --version "${GITHUB_SHA:0:12}" --tests "${extra[@]}"
+            runner=()
+            if [ -n "$QEMU" ]; then
+              runner=("$QEMU")
+              if [ "$libc" = gnu ]; then
+                if [ -z "$SYSROOT" ]; then
+                  echo "glibc $ARCH: compile-only (no runtime sysroot on this runner)"
+                  continue
+                fi
+                runner+=(-L "$SYSROOT")
+              fi
+            fi
+            "${runner[@]}" "$out/cgo.test" -test.v
+            if [ -f "$out/purego.test" ]; then
+              SING_LWIP_LIBRARY="$PWD/$out/libsing-lwip.so" \
+              SING_LWIP_ABI_FIXTURE="$PWD/$out/abi-fixture.so" \
+              "${runner[@]}" "$out/purego.test" -test.v
+            fi
+          done
+      - name: Native race and sanitizers
+        if: matrix.arch == 'amd64'
+        run: |
+          CGO_ENABLED=1 go test -race ./...
+          go run ./cmd/build-lwip test-native
+          go run ./cmd/build-lwip test-upstream-udp
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-linux-${{ matrix.arch }}
+          path: |
+            dist/
+            !dist/**/*.test
+            !dist/**/abi-fixture.*
+          if-no-files-found: error
+          retention-days: 7
+
+  windows-build:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.windows) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go
+        with:
+          target: windows-${{ matrix.arch }}
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: '0.15.2'
+          cache-key: lwip-windows-${{ matrix.arch }}
+      - name: Build MinGW static library, DLL and tests
+        env:
+          ARCH: ${{ matrix.arch }}
+          CPU: ${{ matrix.cpu }}
+        run: |
+          go run ./cmd/build-lwip build --target "windows/$ARCH" \
+            --cc "zig cc -target $CPU-windows-gnu" --ar 'zig ar' \
+            --output "dist/windows_$ARCH" --version "${GITHUB_SHA:0:12}" --tests
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-windows-${{ matrix.arch }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  windows-test:
+    needs: [plan, windows-build]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.windows) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-windows-${{ matrix.arch }}
+          path: dist
+      - name: Run cgo, purego and uint64-handle ABI regressions
+        shell: pwsh
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          $dir = Join-Path $PWD "dist/windows_$env:ARCH"
+          & "$dir/cgo.exe" -test.v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:SING_LWIP_LIBRARY = Join-Path $dir 'sing-lwip.dll'
+          $env:SING_LWIP_ABI_FIXTURE = Join-Path $dir 'abi-fixture.dll'
+          & "$dir/purego.exe" -test.v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  apple:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.apple) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.cache/ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go
+        with:
+          target: apple-${{ matrix.target }}
+      - name: Install ccache
+        run: brew install ccache
+      - name: Identify SDK
+        id: sdk
+        env:
+          SDK: ${{ matrix.sdk }}
+        run: echo "version=$(xcrun --sdk "$SDK" --show-sdk-version)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: .cache/ccache
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.triple }}-${{ steps.sdk.outputs.version }}-${{ hashFiles('bridge.*', 'lwipopts.h', 'lwip_*.c', 'third_party/lwip/src/**') }}
+          restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.triple }}-${{ steps.sdk.outputs.version }}-
+      - name: Build and test
+        env:
+          TARGET: ${{ matrix.target }}
+          SDK: ${{ matrix.sdk }}
+          TRIPLE: ${{ matrix.triple }}
+          RUN_TESTS: ${{ matrix.runtime }}
+        run: |
+          export SDKROOT="$(xcrun --sdk "$SDK" --show-sdk-path)"
+          cc="ccache clang -target $TRIPLE -isysroot $SDKROOT"
+          out="dist/${TARGET//\//_}"
+          extra=()
+          if [ "$RUN_TESTS" = true ]; then extra+=(--tests); fi
+          go run ./cmd/build-lwip build --target "$TARGET" --cc "$cc" --ar 'xcrun ar' \
+            --output "$out" --version "${GITHUB_SHA:0:12}" "${extra[@]}"
+          if [ "$RUN_TESTS" = true ]; then
+            "$out/cgo.test" -test.v
+            SING_LWIP_LIBRARY="$PWD/$out/libsing-lwip.dylib" \
+            SING_LWIP_ABI_FIXTURE="$PWD/$out/abi-fixture.dylib" "$out/purego.test" -test.v
+          else
+            goos=ios
+            arch="$(echo "$TARGET" | cut -d/ -f2)"
+            tags=''
+            if [[ "$TARGET" == tvos/* ]]; then tags=tvos; fi
+            if [[ "$TARGET" == */simulator ]]; then
+              if [[ "$TARGET" == tvos/* ]]; then tags="$tags,tvossimulator"; else tags=iossimulator; fi
+            fi
+            CC="$cc" CGO_ENABLED=1 GOOS="$goos" GOARCH="$arch" go build -tags "$tags" .
+          fi
+          ccache -s
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.triple }}
+          path: |
+            dist/
+            !dist/**/*.test
+            !dist/**/abi-fixture.*
+          if-no-files-found: error
+          retention-days: 7
+
+  android:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.android) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.cache/ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      GOARM: '7'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go
+        with:
+          target: android-${{ matrix.arch }}
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r28
+      - name: Install ccache
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ccache
+      - uses: actions/cache@v4
+        with:
+          path: .cache/ccache
+          key: ccache-android-${{ matrix.arch }}-ndkr28-${{ hashFiles('bridge.*', 'lwipopts.h', 'lwip_*.c', 'third_party/lwip/src/**') }}
+          restore-keys: ccache-android-${{ matrix.arch }}-ndkr28-
+      - name: Build static library and Android test executable
+        env:
+          NDK: ${{ steps.ndk.outputs.ndk-path }}
+          ARCH: ${{ matrix.arch }}
+          COMPILER: ${{ matrix.cc }}
+        run: |
+          tools="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          go run ./cmd/build-lwip build --target "android/$ARCH" \
+            --cc "ccache $tools/$COMPILER" --ar "$tools/llvm-ar" \
+            --output "dist/android_$ARCH" --version "${GITHUB_SHA:0:12}" --static-only --tests
+          ccache -s
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-android-${{ matrix.arch }}
+          path: |
+            dist/
+            !dist/**/*.test
+          if-no-files-found: error
+          retention-days: 7
+
+  freebsd:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.freebsd) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go
+        with:
+          target: freebsd-${{ matrix.arch }}
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: '0.15.2'
+          cache-key: lwip-freebsd-${{ matrix.arch }}
+      - name: Cross-build libraries and test executables
+        env:
+          ARCH: ${{ matrix.arch }}
+          CPU: ${{ matrix.cpu }}
+        run: |
+          go run ./cmd/build-lwip build --target "freebsd/$ARCH" \
+            --cc "zig cc -target $CPU-freebsd" --ar 'zig ar' \
+            --output "dist/freebsd_$ARCH" --version "${GITHUB_SHA:0:12}" --tests
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-freebsd-${{ matrix.arch }}
+          path: |
+            dist/
+            !dist/**/*.test
+            !dist/**/abi-fixture.*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [plan, go-compat, linux, windows-build, windows-test, apple, android, freebsd]
+    if: github.event_name != 'pull_request' && (github.ref_name == 'main' || github.ref_name == 'dev')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: publish-${{ github.ref_name == 'main' && 'go' || 'go_dev' }}
+      cancel-in-progress: false
+    env:
+      GIT_AUTHOR_NAME: github-actions[bot]
+      GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      GIT_COMMITTER_NAME: github-actions[bot]
+      GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      TARGET_BRANCH: ${{ github.ref_name == 'main' && 'go' || 'go_dev' }}
+      SOURCE_BRANCH: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-go
+        with:
+          target: publish
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: artifacts
+      - name: Publish complete pinned module graph
+        run: |
+          go run ./cmd/build-lwip publish --artifacts artifacts \
+            --branch "$TARGET_BRANCH" --source-branch "$SOURCE_BRANCH"
