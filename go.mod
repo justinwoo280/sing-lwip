@@ -2,40 +2,4 @@ module github.com/justinwoo280/sing-lwip
 
 go 1.24.0
 
-require (
-	github.com/ebitengine/purego v0.10.0
-	github.com/justinwoo280/sing-lwip/lib/android_386 v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/android_amd64 v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/android_arm v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/android_arm64 v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/darwin_amd64 v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/darwin_arm64 v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/freebsd_amd64 v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/freebsd_arm64 v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/ios_amd64_simulator v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/ios_arm64 v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/ios_arm64_simulator v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_386_gnu v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_386_musl v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_amd64_gnu v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_amd64_musl v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_arm64_gnu v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_arm64_musl v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_arm_gnu v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_arm_musl v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_loong64_gnu v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_loong64_musl v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_mips64le_gnu v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_mipsle_gnu v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_mipsle_musl v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_ppc64le_gnu v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_ppc64le_musl v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_riscv64_gnu v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/linux_riscv64_musl v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/tvos_amd64_simulator v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/tvos_arm64 v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/tvos_arm64_simulator v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/windows_386 v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/windows_amd64 v0.0.0-20261026094735-791a9e9fbf40
-	github.com/justinwoo280/sing-lwip/lib/windows_arm64 v0.0.0-20261026094735-791a9e9fbf40
-)
+require github.com/ebitengine/purego v0.10.0

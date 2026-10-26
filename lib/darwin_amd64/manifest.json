@@ -1,10 +1,10 @@
 {
   "abi": 2,
-  "version": "1d26732af3bb",
+  "version": "31e92e4a08d5",
   "target": "darwin/amd64",
   "purego": true,
   "purego_requires_cgo": false,
-  "source_revision": "1d26732af3bb3d586d9bc62e2469e5678a284180",
+  "source_revision": "31e92e4a08d51a4feb30f2936264831df6e38d39",
   "lwip_source": {
     "repository": "https://github.com/justinwoo280/lwip.git",
     "revision": "02541e94fc3b0d4cbd0db33d7c610bd7f1b1086d",
@@ -16,7 +16,7 @@
     "LICENSE": "690697ca6c0b42113e59f87d2963d446365a42a07cf08e5bc460569edf2c8a2a",
     "LWIP-LICENSE": "ef4aac92e05e87cd1cdc140870ed52206ba03d4a7fe46c1e11d7ffa6c87d252b",
     "bridge.h": "08e95d5d89a1b026e245fe2586d1d9dacb11624749db9c9c1e59bbcb4adfd7b7",
-    "libsing-lwip.a": "c4b5c4b393625b5356fefbfb0d71c7b68330fd82be62c5da49f904d945477276",
+    "libsing-lwip.a": "e870aa4fe19e92fb68ce0709457a8503abae7a17fe0318901f9c8a414e1c923e",
     "libsing-lwip.dylib": "ffeda294bc4d449b1ee6165a0bbdfe238db64691451d7f9bcd78fcfc41b9c14f"
   }
 }

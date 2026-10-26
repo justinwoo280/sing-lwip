@@ -27,7 +27,7 @@ Commands:
   sync-lwip          Fetch or verify the locked lwIP fork commit
   build              Build and package a target's native libraries
   windows            Build an MSVC DLL using Clang/LLD and an xwin SDK
-  zig-cc             Adapt Go's MIPS compiler flags for Zig (SING_LWIP_CC)
+  zig-cc             Adapt Go's MIPS flags: <zig cc ...> -- <compiler arguments>
   matrix             Print a CI build matrix or the release target list
   publish            Validate artifacts and publish pinned native submodules
   test-native        Run native ASan/UBSan/LSan regressions

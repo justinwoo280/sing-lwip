@@ -123,7 +123,10 @@ jobs:
           SYSROOT: ${{ matrix.sysroot }}
           GOARM: '7'
         run: |
-          for libc in gnu musl; do
+          libcs=(gnu musl)
+          # Verify the MIPS compiler wrapper also survives a warm-cache switch back.
+          if [ "$ARCH" = mipsle ]; then libcs+=(gnu); fi
+          for libc in "${libcs[@]}"; do
             if [ "$libc" = musl ] && [ "$MUSL" != true ]; then continue; fi
             out="dist/linux_${ARCH}_${libc}"
             abi="$GNU_ABI"

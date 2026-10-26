@@ -241,8 +241,7 @@ func buildTests(root, out, cc string, t target, staticOnly bool) error {
 			if err != nil {
 				return err
 			}
-			env["SING_LWIP_CC"] = cc
-			env["CC"] = fmt.Sprintf("%q --root %q zig-cc", executable, root)
+			env["CC"] = zigCCWrapper(executable, root, cc)
 		}
 		name, suffix := "cgo", ".test"
 		var tags []string
