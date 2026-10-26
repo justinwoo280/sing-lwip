@@ -6,14 +6,29 @@
 Go bindings for [HEV lwIP](https://github.com/heiher/lwip), with CGO and PureGo backends for transparent packet processing.
 
 Native fixes are maintained in [justinwoo280/lwip](https://github.com/justinwoo280/lwip).
-The [source lock](third_party/lwip.lock.json) pins the exact fork commit; the Go synchronizer imports its sources for CGO builds.
+The [source lock](third_party/lwip.lock.json) pins the exact fork commit; the Go synchronizer imports the C sources used by all native builds.
 
 sing-lwip accepts IPv4/IPv6 packets and exposes TCP streams and UDP datagrams. The application supplies packet I/O,
 connection routing and upstream dialing. It is independent of sing-tun and sing-box; those projects can use it as a backend.
 
+## Native libraries and Go bindings
+
+The **C toolchain** compiles lwIP and `bridge.c` into native code. The build tool packages that code as a static
+archive (`.a`) or links it into a shared library (`.so`, `.dylib`, `.dll`). **CGO** and **PureGo** describe how the Go
+application calls this native code. PureGo is an FFI library that loads and calls the shared library; it does not compile C code.
+
+| Go binding mode | How sing-lwip native code is used |
+|---|---|
+| CGO, bundled sources | The Go build invokes a C compiler and links the compiled native code into the application. |
+| CGO, `with_lwip_prebuilt` | The target linker links the prebuilt `libsing-lwip.a` into the application. |
+| PureGo, `with_purego` | Go compiles the application; at runtime PureGo loads the separately C-built shared library. |
+
+CGO supports both static and dynamic native linking in general; this package's documented CGO modes use the bundled
+sources or a static archive. Static linkage here refers to sing-lwip; system-library dependencies depend on the target toolchain.
+
 ## Build targets
 
-| Target | CGO | PureGo | Published native libraries |
+| Target | CGO binding | PureGo loader | C-built native artifacts |
 |---|---|---|---|
 | Linux glibc: amd64, arm64, 386, arm, loong64, ppc64le, riscv64 | Yes | Yes | `.a`, `.so` |
 | Linux glibc: mipsle, mips64le | Yes | — | `.a`, `.so` |
@@ -38,7 +53,7 @@ See the [Actions results](https://github.com/justinwoo280/sing-lwip/actions/work
 
 ## Installation
 
-### CGO: compile from source
+### CGO: compile bundled C sources
 
 The source branch includes the native C sources. A normal CGO build compiles them with the application:
 
@@ -50,7 +65,7 @@ CGO_ENABLED=1 go build ./...
 Cross-compilation requires a C compiler and sysroot for the target. Windows CGO uses MinGW;
 Android uses the NDK; Apple platforms use Xcode and the corresponding SDK.
 
-### CGO: use prebuilt static libraries
+### CGO: link a prebuilt static library
 
 The `go` branch contains the Go bindings and generated platform-library dependencies:
 
@@ -72,7 +87,10 @@ CC=musl-gcc CGO_ENABLED=1 go build -tags 'with_lwip_prebuilt with_musl' ./...
 Apple simulator builds use `iossimulator`, or `tvos,tvossimulator` for tvOS. Device tvOS builds use `tvos`.
 CGO still needs a compatible target compiler/linker when using a prebuilt archive.
 
-### PureGo: load a shared library
+### PureGo: load a C-built shared library
+
+The following command builds the Go executable using the PureGo binding. At runtime, it loads the matching native
+shared library built by the C toolchain and distributed separately:
 
 ```sh
 go get github.com/justinwoo280/sing-lwip@go
@@ -148,7 +166,8 @@ window, retransmission, FIN and PSH semantics. `ReadPackets` remains available w
 
 ## Building native libraries
 
-All tooling is written in Go and lives in `cmd/build-lwip`.
+The build CLI is written in Go and lives in `cmd/build-lwip`. It invokes the target C compiler, archiver and linker
+(for example Zig CC, Clang or GCC) to build the static and shared libraries from the same C sources.
 
 ```sh
 git clone https://github.com/justinwoo280/sing-lwip.git
@@ -196,7 +215,7 @@ The [native build workflow](.github/workflows/native-build.yml) follows this flo
 main / dev push
   ├── fetch and verify the locked lwIP fork commit
   ├── validate generated sources and publisher tests
-  ├── build the platform/libc matrix
+  ├── compile C static/shared libraries for the platform/libc matrix
   ├── run native or QEMU tests where available
   └── verify the complete artifact set
        └── publish go / go_dev
