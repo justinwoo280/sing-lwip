@@ -1,0 +1,17 @@
+{
+  "abi": 2,
+  "version": "dabef7847384",
+  "target": "android/arm",
+  "goarm": "7",
+  "purego": false,
+  "purego_requires_cgo": true,
+  "source_revision": "dabef7847384940eb8e06d6f539aa242c36cc7ad",
+  "native_source_sha256": "46c800d90d992106d7f6ec282c2fba8d6a587df663defb423fa3d7f55fbf3a9c",
+  "compiler": "Android (12896553, +pgo, +bolt, +lto, +mlgo, based on r530567c) clang version 19.0.0 (https://android.googlesource.com/toolchain/llvm-project 97a699bf4812a18fb657c2779f5296a4ab2694d2)",
+  "files": {
+    "LICENSE": "690697ca6c0b42113e59f87d2963d446365a42a07cf08e5bc460569edf2c8a2a",
+    "LWIP-LICENSE": "ef4aac92e05e87cd1cdc140870ed52206ba03d4a7fe46c1e11d7ffa6c87d252b",
+    "bridge.h": "08e95d5d89a1b026e245fe2586d1d9dacb11624749db9c9c1e59bbcb4adfd7b7",
+    "libsing-lwip.a": "f478ca4e2a0a8e93886fe9b53ad421d116592ee062f6e16dcfdc84e1d6e29501"
+  }
+}

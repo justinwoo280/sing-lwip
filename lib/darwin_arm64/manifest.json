@@ -1,0 +1,17 @@
+{
+  "abi": 2,
+  "version": "dabef7847384",
+  "target": "darwin/arm64",
+  "purego": true,
+  "purego_requires_cgo": false,
+  "source_revision": "dabef7847384940eb8e06d6f539aa242c36cc7ad",
+  "native_source_sha256": "46c800d90d992106d7f6ec282c2fba8d6a587df663defb423fa3d7f55fbf3a9c",
+  "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)",
+  "files": {
+    "LICENSE": "690697ca6c0b42113e59f87d2963d446365a42a07cf08e5bc460569edf2c8a2a",
+    "LWIP-LICENSE": "ef4aac92e05e87cd1cdc140870ed52206ba03d4a7fe46c1e11d7ffa6c87d252b",
+    "bridge.h": "08e95d5d89a1b026e245fe2586d1d9dacb11624749db9c9c1e59bbcb4adfd7b7",
+    "libsing-lwip.a": "537c28f038a8b64cf0cbcf8d2aa4240b96ffda6cb3916f9e27fd0f089f7604b0",
+    "libsing-lwip.dylib": "8565a21a5b12ea0167e2f51da94ae608177a56f8b634af7f41fc31fcbe7c2398"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "abi": 2,
+  "version": "dabef7847384",
+  "target": "linux/arm",
+  "libc": "gnu",
+  "goarm": "7",
+  "purego": true,
+  "purego_requires_cgo": false,
+  "source_revision": "dabef7847384940eb8e06d6f539aa242c36cc7ad",
+  "native_source_sha256": "46c800d90d992106d7f6ec282c2fba8d6a587df663defb423fa3d7f55fbf3a9c",
+  "compiler": "clang version 20.1.2 (https://github.com/ziglang/zig-bootstrap 7ef74e656cf8ddbd6bf891a8475892aa1afa6891)",
+  "files": {
+    "LICENSE": "690697ca6c0b42113e59f87d2963d446365a42a07cf08e5bc460569edf2c8a2a",
+    "LWIP-LICENSE": "ef4aac92e05e87cd1cdc140870ed52206ba03d4a7fe46c1e11d7ffa6c87d252b",
+    "bridge.h": "08e95d5d89a1b026e245fe2586d1d9dacb11624749db9c9c1e59bbcb4adfd7b7",
+    "libsing-lwip.a": "749c4beb55b37b7be94f07a8bb7bcb9a051237a3f0114af2f191720a9a135647",
+    "libsing-lwip.so": "2971385eecc420c9e1fb2f8e9e68a7254e76c0da1c56a5382c248e9fa4f61583"
+  }
+}
