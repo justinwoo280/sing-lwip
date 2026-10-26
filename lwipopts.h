@@ -1,6 +1,13 @@
 #ifndef SING_LWIP_OPTIONS_H
 #define SING_LWIP_OPTIONS_H
 #include <stdint.h>
+#if defined(__ANDROID__)
+/* Current bionic provides fd_set; disable the legacy port's duplicate typedef. */
+#include <sys/select.h>
+#ifndef FD_SET_DEFINED
+#define FD_SET_DEFINED 1
+#endif
+#endif
 #include "third_party/lwip/src/ports/include/lwipopts.h"
 /* Windows uses LLP64: pointers are 64-bit without __LP64__. Reassembly's
  * pointer-bearing helper must not overwrite the eight-byte fragment header. */

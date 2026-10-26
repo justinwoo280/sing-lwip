@@ -129,7 +129,7 @@ jobs:
             extra=()
             if [ "$libc" = musl ]; then
               abi=musl
-              if [ "$ARCH" = arm ]; then abi=musleabihf; fi
+              if [ "$ARCH" = arm ] || [ "$ARCH" = mipsle ]; then abi=musleabihf; fi
               extra+=(--static-only)
             fi
             cc="zig cc -target $CPU-linux-$abi"
@@ -218,11 +218,11 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           $dir = Join-Path $PWD "dist/windows_$env:ARCH"
-          & "$dir/cgo.exe" -test.v
+          & "$dir/cgo.exe" '-test.v'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:SING_LWIP_LIBRARY = Join-Path $dir 'sing-lwip.dll'
           $env:SING_LWIP_ABI_FIXTURE = Join-Path $dir 'abi-fixture.dll'
-          & "$dir/purego.exe" -test.v
+          & "$dir/purego.exe" '-test.v'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   apple:

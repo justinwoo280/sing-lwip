@@ -386,8 +386,8 @@ func verifyHostLibraries(directory string, builds []nativeBuild) error {
 			if t.GOOS == "freebsd" {
 				command = append(command, "-gcflags=github.com/ebitengine/purego/internal/fakecgo=-std")
 			}
-			if t.GOOS == "linux" && t.Arch == "arm" {
-				command = append(command, "-ldflags=-I=/lib/ld-linux-armhf.so.3")
+			if t.puregoInterpreter() != "" {
+				command = append(command, "-ldflags=-I="+t.puregoInterpreter())
 			}
 			if err := run(directory, env, []string{"go"}, append(command, ".")...); err != nil {
 				return fmt.Errorf("published PureGo consumer: %w", err)

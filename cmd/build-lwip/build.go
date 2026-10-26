@@ -222,11 +222,23 @@ func buildCommand(root string, args []string) error {
 }
 
 func buildTests(root, out, cc string, t target, staticOnly bool) error {
+	compiler, err := commandWords(cc)
+	if err != nil {
+		return err
+	}
 	for _, pure := range []bool{false, true} {
 		if pure && (staticOnly || !t.purego()) {
 			continue
 		}
 		env := map[string]string{"GOOS": t.GOOS, "GOARCH": t.Arch, "CC": cc, "CGO_ENABLED": "1"}
+		if strings.HasPrefix(t.Arch, "mips") && isZigCC(compiler) {
+			executable, err := os.Executable()
+			if err != nil {
+				return err
+			}
+			env["SING_LWIP_CC"] = cc
+			env["CC"] = fmt.Sprintf("%q --root %q zig-cc", executable, root)
+		}
 		name, suffix := "cgo", ".test"
 		var tags []string
 		if pure {
@@ -259,13 +271,17 @@ func buildTests(root, out, cc string, t target, staticOnly bool) error {
 		if pure && t.GOOS == "freebsd" {
 			command = append(command, "-gcflags=github.com/ebitengine/purego/internal/fakecgo=-std")
 		}
-		if pure && t.GOOS == "linux" && t.Arch == "arm" {
-			// Go's no-cgo ARM linker defaults to the soft-float loader name.
-			// Our Linux ARM libraries use the armhf ABI.
-			command = append(command, "-ldflags=-I=/lib/ld-linux-armhf.so.3")
+		if pure && t.puregoInterpreter() != "" {
+			command = append(command, "-ldflags=-I="+t.puregoInterpreter())
 		}
 		if strings.HasPrefix(t.Arch, "mips") {
 			command = append(command, "-ldflags=-w")
+		}
+		if !pure && t.GOOS == "freebsd" && t.Arch == "arm64" && runtime.GOOS != "freebsd" {
+			// Go mandates GNU ld.bfd for FreeBSD/arm64 executables. Zig ships
+			// LLD; check the CGO package here and link its test on FreeBSD.
+			fmt.Println("FreeBSD/arm64 CGO: package compile check (native test linking requires ld.bfd)")
+			command = []string{"build", "-tags", strings.Join(tags, ",")}
 		}
 		if err := run(root, env, []string{"go"}, append(command, ".")...); err != nil {
 			return err

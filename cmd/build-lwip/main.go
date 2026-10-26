@@ -26,6 +26,7 @@ Commands:
   generate           Generate cgo compilation units and source fingerprints
   build              Build and package a target's native libraries
   windows            Build an MSVC DLL using Clang/LLD and an xwin SDK
+  zig-cc             Adapt Go's MIPS compiler flags for Zig (SING_LWIP_CC)
   matrix             Print a CI build matrix or the release target list
   publish            Validate artifacts and publish pinned native submodules
   test-native        Run native ASan/UBSan/LSan regressions
@@ -52,6 +53,8 @@ Use <command> --help for command options.`)
 		return buildCommand(*root, flags.Args()[1:])
 	case "windows":
 		return windowsCommand(*root, flags.Args()[1:])
+	case "zig-cc":
+		return zigCCCommand(flags.Args()[1:])
 	case "matrix":
 		return matrixCommand(flags.Args()[1:])
 	case "publish":

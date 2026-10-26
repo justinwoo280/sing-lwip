@@ -24,6 +24,7 @@ connection routing and upstream dialing. It is independent of sing-tun and sing-
 Go **1.24 or newer** is required. CI checks Go 1.24/1.25 compatibility and builds the release matrix with Go 1.26.
 Published ARM32 libraries target **ARMv7** (`GOARM=7`).
 Linux ARM32 artifacts use the hard-float (armhf) ABI.
+Published MIPS libraries also use the hard-float ABI (`GOMIPS=hardfloat` / `GOMIPS64=hardfloat`).
 Android artifacts target API 23; Apple artifacts target macOS 12 / iOS 15 / tvOS 15.
 Musl and mobile distributions use CGO static linking.
 
@@ -114,6 +115,8 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build \
   -tags with_purego -ldflags '-I /lib/ld-linux-armhf.so.3' ./...
 ```
 
+Linux RISC-V PureGo likewise needs `-ldflags '-I /lib/ld-linux-riscv64-lp64d.so.1'` for the published LP64D library.
+
 ## API overview
 
 - `New(Options)` creates an independent network interface. All instances share a serialized native core.
@@ -162,6 +165,8 @@ go run ./cmd/build-lwip build --target linux/amd64 \
 The output includes native libraries, C ABI headers, licenses, an ABI test fixture, a source/toolchain manifest,
 SHA256SUMS and a ZIP (Windows) or tar.gz package. `--tests` also builds target-specific test executables.
 `--static-only` is used for musl/mobile packaging and is automatic for iOS/tvOS.
+FreeBSD/arm64 CGO executable linking requires GNU `ld.bfd`; the Linux cross-build checks the CGO package and builds
+the PureGo test executable. Run CGO tests on FreeBSD with `devel/binutils` installed.
 
 `CC`, `AR`, `CFLAGS`, `CPPFLAGS` and `LDFLAGS` are supported. The compiler selects the actual libc;
 `--libc gnu|musl` records the Linux artifact variant. The builder verifies the emitted binary's architecture and byte order.

@@ -61,6 +61,19 @@ func (t target) library() string {
 	}
 }
 
+// Go's no-cgo linker defaults differ from these published glibc ABIs.
+func (t target) puregoInterpreter() string {
+	if t.GOOS == "linux" {
+		switch t.Arch {
+		case "arm":
+			return "/lib/ld-linux-armhf.so.3"
+		case "riscv64":
+			return "/lib/ld-linux-riscv64-lp64d.so.1"
+		}
+	}
+	return ""
+}
+
 func checkArch(path, arch string) error {
 	f, err := os.Open(path)
 	if err != nil {
