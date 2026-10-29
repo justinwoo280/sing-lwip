@@ -4,9 +4,14 @@ The native source is maintained in [justinwoo280/lwip](https://github.com/justin
 a fork of [heiher/lwip](https://github.com/heiher/lwip).
 
 [`lwip.lock.json`](lwip.lock.json) pins the repository, full commit SHA and SHA256
-digest of the imported `LICENSE` and `src/` tree. `lwip/` is the generated,
-byte-for-byte snapshot of that commit. Keeping it in the Go module lets a normal
-CGO consumer compile the package directly with `go get`.
+digest of the downloaded `LICENSE` and `src/` tree. `lwip/` is an ignored build
+cache, not part of this repository or the published Go module. Native builders
+fetch the exact locked commit when this cache is absent and verify its contents
+on every reuse. They never resolve a branch or tag in place of the pinned SHA.
+
+Before a plain source-CGO `go build` or `go test`, prepare the cache with
+`go run ./cmd/build-lwip sync-lwip`. The Go build itself cannot download C sources.
+Prebuilt CGO and PureGo consumers do not need the source cache.
 
 ## Current pin
 
@@ -27,7 +32,7 @@ The fork contains three independently reviewable changes:
 
 Each change was built independently against the pinned upstream base. The UDP
 regression misroutes four datagrams per IP family before its fix and none after.
-The imported native source is identical to the previously validated source tree.
+The locked tree digest covers every downloaded source file and its relative path.
 
 ## Updating the dependency
 
@@ -38,14 +43,23 @@ go run ./cmd/build-lwip sync-lwip --revision <full-commit-sha>
 go run ./cmd/build-lwip sync-lwip --check --remote
 ```
 
-The Go synchronizer fetches that exact Git commit, imports `LICENSE` and `src/`,
-updates the lock and regenerates the CGO wrappers. It preserves local edits by
-requiring the existing snapshot to match its lock before replacing it.
-`sync-lwip --check` verifies the local snapshot without network access;
-`--check --remote` also verifies it against the fork.
+With `--revision`, the Go synchronizer fetches that exact Git commit, prepares
+`LICENSE` and `src/`, updates the lock and regenerates the CGO wrappers. Commit
+only the lock and generated wrappers; the cache stays ignored. Existing cached
+sources must match their current lock before a pin update can replace them.
 
-CI performs the remote provenance check before building. Native builds and the
-publisher verify the local lock; every native manifest and `native-build.json`
+Without flags, `sync-lwip` prepares or verifies the cache without changing the
+lock or generated files. `--check` verifies an existing cache offline;
+`--check --remote` also verifies the remote commit and works without a local
+cache, creating no files. `generate --check` prepares missing sources, then checks
+the committed generated files without rewriting them.
+
+A mismatched cache is rejected rather than silently overwritten. If a checkout
+changes the lock, preserve any local source edits in the fork, remove the stale
+`third_party/lwip/` directory and prepare the newly locked sources again.
+
+CI starts from the lock and fetches its exact source commit before compiling.
+Native builds and the publisher verify the downloaded tree; every native manifest and `native-build.json`
 record the same lwIP repository, commit and source-tree digest.
 
 The bridge ABI, buffering, capability policy and platform configuration are

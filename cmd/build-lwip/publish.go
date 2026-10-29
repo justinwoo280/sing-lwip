@@ -44,7 +44,7 @@ func publishCommand(root string, args []string) error {
 	if status != "" {
 		return fmt.Errorf("commit source changes before publishing: %s", status)
 	}
-	source, err := verifyLWIPSource(root)
+	source, err := ensureLWIPSource(root)
 	if err != nil {
 		return err
 	}

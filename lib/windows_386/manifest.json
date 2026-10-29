@@ -1,10 +1,10 @@
 {
   "abi": 2,
-  "version": "d7aafffcecc0",
+  "version": "179ced706d96",
   "target": "windows/386",
   "purego": true,
   "purego_requires_cgo": false,
-  "source_revision": "d7aafffcecc0b0906ff9b9afc90e6870444b379d",
+  "source_revision": "179ced706d96358edb2d5409f6b16384c318de45",
   "lwip_source": {
     "repository": "https://github.com/justinwoo280/lwip.git",
     "revision": "02541e94fc3b0d4cbd0db33d7c610bd7f1b1086d",
@@ -17,6 +17,6 @@
     "LWIP-LICENSE": "ef4aac92e05e87cd1cdc140870ed52206ba03d4a7fe46c1e11d7ffa6c87d252b",
     "bridge.h": "08e95d5d89a1b026e245fe2586d1d9dacb11624749db9c9c1e59bbcb4adfd7b7",
     "libsing-lwip.a": "5a5813719d7c7a5ecbb9bfc91dcaeae1f223a44396eee68d597b64d56edbbbf1",
-    "sing-lwip.dll": "14294d7016efea229bd02774bfc747e1455dc7ac33ddcdf67046ce040a303ab6"
+    "sing-lwip.dll": "9bc694683895bc32d9b99e4266dcbf4deca09ab8afb3ca761cc3a2f366e41777"
   }
 }

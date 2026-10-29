@@ -1,11 +1,11 @@
 {
   "abi": 2,
-  "version": "d7aafffcecc0",
+  "version": "179ced706d96",
   "target": "linux/386",
   "libc": "musl",
   "purego": false,
   "purego_requires_cgo": false,
-  "source_revision": "d7aafffcecc0b0906ff9b9afc90e6870444b379d",
+  "source_revision": "179ced706d96358edb2d5409f6b16384c318de45",
   "lwip_source": {
     "repository": "https://github.com/justinwoo280/lwip.git",
     "revision": "02541e94fc3b0d4cbd0db33d7c610bd7f1b1086d",

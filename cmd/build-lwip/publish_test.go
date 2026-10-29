@@ -92,7 +92,7 @@ func TestPublishPinnedGraphAndHistory(t *testing.T) {
 	git(root, "remote", "add", "origin", remote)
 	write(filepath.Join(root, "go.mod"), "module example.com/sing-lwip\n\ngo 1.24.0\n")
 	write(filepath.Join(root, "lwip.go"), "package lwip\n")
-	write(filepath.Join(root, ".gitignore"), "/lib/\n/prebuilt_*.go\n")
+	write(filepath.Join(root, ".gitignore"), "/lib/\n/prebuilt_*.go\n/third_party/lwip/\n")
 	for _, name := range []string{"bridge.c", "lwip_core.c"} {
 		write(filepath.Join(root, name), "//go:build cgo && !with_lwip_prebuilt\n\n/* fixture */\n")
 	}
@@ -145,6 +145,9 @@ func TestPublishPinnedGraphAndHistory(t *testing.T) {
 			t.Fatal(err)
 		}
 		published := strings.Fields(git(root, "ls-remote", "origin", "refs/heads/go"))[0]
+		if files := git(root, "ls-tree", "-r", "--name-only", published, "--", "third_party/lwip"); files != "" {
+			t.Fatalf("published branch contains the downloaded source cache: %s", files)
+		}
 		mod := git(root, "show", published+":go.mod")
 		if strings.Contains(mod, "replace") || !strings.Contains(mod, "example.com/sing-lwip/lib/"+id+" v0.0.0-") {
 			t.Fatalf("unpublished or unpinned dependency in go.mod: %s", mod)

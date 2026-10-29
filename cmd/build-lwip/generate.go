@@ -26,6 +26,9 @@ func generateCommand(root string, args []string) error {
 	if err := parseFlags(flags, args); err != nil {
 		return err
 	}
+	if _, err := ensureLWIPSource(root); err != nil {
+		return err
+	}
 	if err := generateChecksums(root, *check); err != nil {
 		return err
 	}

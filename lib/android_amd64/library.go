@@ -2,4 +2,4 @@
 package library
 
 const ABI = 2
-const SourceCommit = "d7aafffcecc0b0906ff9b9afc90e6870444b379d"
+const SourceCommit = "179ced706d96358edb2d5409f6b16384c318de45"

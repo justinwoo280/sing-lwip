@@ -16,6 +16,9 @@ func testNativeCommand(root string, args []string) error {
 	if err := parseFlags(flags, args); err != nil {
 		return err
 	}
+	if err := generateCommand(root, []string{"--check"}); err != nil {
+		return err
+	}
 	cc, err := commandWords(*compiler)
 	if err != nil {
 		return err
@@ -54,6 +57,9 @@ func testUDPCommand(root string, args []string) error {
 	flags := flag.NewFlagSet("test-upstream-udp", flag.ContinueOnError)
 	compiler := flags.String("cc", envDefault("CC", "cc"), "C compiler command")
 	if err := parseFlags(flags, args); err != nil {
+		return err
+	}
+	if err := generateCommand(root, []string{"--check"}); err != nil {
 		return err
 	}
 	cc, err := commandWords(*compiler)
