@@ -30,9 +30,12 @@ func testNativeCommand(root string, args []string) error {
 	}
 	defer os.RemoveAll(directory)
 	// abi.c is a shared-library FFI fixture, not an executable C regression.
-	for _, name := range []string{"gso", "rx_buffer", "udp_netif"} {
+	for _, name := range []string{"allocator", "gso", "rx_buffer", "udp_netif"} {
 		binary := filepath.Join(directory, name)
 		command := []string{"-O1", "-g", "-fsanitize=address,undefined", "-fno-omit-frame-pointer"}
+		if name == "udp_netif" {
+			command = append(command, "-DSING_LWIP_STANDALONE")
+		}
 		command = append(command, includes(root)...)
 		command = append(command, sources...)
 		command = append(command, filepath.Join(root, "tests", name+".c"), "-o", binary)
@@ -84,7 +87,7 @@ func testUDPCommand(root string, args []string) error {
 		if err := os.WriteFile(udp, []byte(phase.source), 0o644); err != nil {
 			return err
 		}
-		command := append([]string{"-O2"}, includes(root)...)
+		command := append([]string{"-O2", "-DSING_LWIP_STANDALONE"}, includes(root)...)
 		for _, source := range sources {
 			if filepath.Base(source) != "lwip_core_udp.c" {
 				command = append(command, source)

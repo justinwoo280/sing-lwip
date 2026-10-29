@@ -4,6 +4,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define SL_ASAN 1
+#endif
+#endif
+#if defined(__SANITIZE_ADDRESS__)
+#define SL_ASAN 1
+#endif
+#ifdef SL_ASAN
+#include <sanitizer/asan_interface.h>
+#define SL_POISON(p,n) __asan_poison_memory_region(p,n)
+#define SL_UNPOISON(p,n) __asan_unpoison_memory_region(p,n)
+#else
+#define SL_POISON(p,n) ((void)0)
+#define SL_UNPOISON(p,n) ((void)0)
+#endif
 #ifdef _WIN32
 #include <windows.h>
 #include <stdarg.h>
@@ -57,6 +73,80 @@ static sl_context *contexts;
 static sl_connection *connections[1024];
 static uint64_t next_stack, next_connection;
 static uint32_t ticks;
+
+/* All accesses, including lwIP's final pbuf/segment release, hold the Go core
+ * lock. Reusing live pages avoids libc trimming the large transmit buffers
+ * between bursts. Cache at most 4 MiB process-wide and 2 MiB in any size class;
+ * active allocations are still governed by the connection/output limits.
+ * The final class accommodates a 64 KiB payload plus pbuf/header metadata. */
+#define SL_ALLOC_RETAIN (4u << 20)
+#define SL_ALLOC_BIN_RETAIN (2u << 20)
+static const size_t alloc_sizes[]={128,256,512,1024,2048,4096,8192,16384,32768,65536,65792};
+#define SL_ALLOC_BINS (sizeof(alloc_sizes)/sizeof(alloc_sizes[0]))
+typedef union sl_allocation sl_allocation;
+union sl_allocation {
+    struct { sl_allocation *next; size_t bin; } header;
+    /* Preserve malloc alignment on ILP32, LP64 and LLP64 targets. */
+    long double alignment;
+    void *pointer_alignment;
+    uint64_t integer_alignment;
+};
+static sl_allocation *alloc_free[SL_ALLOC_BINS];
+static size_t alloc_retained, alloc_bin_bytes[SL_ALLOC_BINS];
+
+void *sl_alloc(size_t size) {
+    size_t bin=0;
+    while (bin<SL_ALLOC_BINS && size>alloc_sizes[bin]) bin++;
+    sl_allocation *p;
+    if (bin<SL_ALLOC_BINS) {
+        size=alloc_sizes[bin];
+        p=alloc_free[bin];
+        if (p) {
+            alloc_free[bin]=p->header.next;
+            alloc_retained-=size+sizeof(*p);
+            alloc_bin_bytes[bin]-=size+sizeof(*p);
+            SL_UNPOISON(p+1,size);
+            return p+1;
+        }
+    }
+    if (size>SIZE_MAX-sizeof(*p)) return NULL;
+    p=malloc(sizeof(*p)+size);
+    if (!p) return NULL;
+    p->header.bin=bin;
+    return p+1;
+}
+void *sl_calloc(size_t count, size_t size) {
+    if (size && count>SIZE_MAX/size) return NULL;
+    size*=count;
+    void *p=sl_alloc(size);
+    if (p) memset(p,0,size);
+    return p;
+}
+void sl_free(void *pointer) {
+    if (!pointer) return;
+    sl_allocation *p=(sl_allocation *)pointer-1;
+    size_t bin=p->header.bin;
+    if (bin<SL_ALLOC_BINS) {
+        size_t size=alloc_sizes[bin]+sizeof(*p);
+        if (alloc_retained+size<=SL_ALLOC_RETAIN && alloc_bin_bytes[bin]+size<=SL_ALLOC_BIN_RETAIN) {
+            p->header.next=alloc_free[bin]; alloc_free[bin]=p;
+            alloc_retained+=size; alloc_bin_bytes[bin]+=size;
+            SL_POISON(p+1,alloc_sizes[bin]);
+            return;
+        }
+    }
+    free(p);
+}
+static void clear_alloc(void) {
+    for (size_t bin=0;bin<SL_ALLOC_BINS;bin++) {
+        while (alloc_free[bin]) {
+            sl_allocation *p=alloc_free[bin];
+            alloc_free[bin]=p->header.next; free(p);
+        }
+        alloc_bin_bytes[bin]=0;
+    }
+    alloc_retained=0;
+}
 
 /* Large receive buffers outlive sl_input (queued TCP, out-of-order data or IP
  * fragments). Recycle only through lwIP's final pbuf release, never on return
@@ -163,7 +253,7 @@ static sl_connection *new_connection(sl_context *s, const ip_addr_t *src, uint16
 }
 static int enqueue(sl_connection *c, struct pbuf *p) {
     if (c->queued+p->tot_len>262144 || c->packets>=256) return 0;
-    sl_chunk *q=calloc(1,sizeof(*q));
+    sl_chunk *q=sl_calloc(1,sizeof(*q));
     if (!q) return 0;
     q->p=p;
     if (c->udp) address_make(q->address,&c->udp->remote_ip,c->udp->remote_port,
@@ -176,7 +266,7 @@ static void discard_input(sl_connection *c) {
     while (c->head) {
         sl_chunk *q=c->head; c->head=q->next;
         if (c->tcp) tcp_recved(c->tcp,(u16_t)(q->p->tot_len-q->offset));
-        pbuf_free(q->p); free(q);
+        pbuf_free(q->p); sl_free(q);
     }
     c->tail=NULL; c->queued=0; c->packets=0;
 }
@@ -238,7 +328,7 @@ static void on_udp_accept(void *arg, struct udp_pcb *pcb, struct pbuf *p, const 
 static err_t output(struct netif *n, struct pbuf *p) {
     sl_context *s=n->state;
     if (s->out_bytes+p->tot_len>(4u<<20)) return ERR_MEM;
-    sl_packet *q=malloc(sizeof(*q)+p->tot_len);
+    sl_packet *q=sl_alloc(sizeof(*q)+p->tot_len);
     if (!q) return ERR_MEM;
     q->len=p->tot_len; q->gso_size=p->gso_size; q->next=NULL;
     pbuf_copy_partial(p,q->data,p->tot_len,0);
@@ -318,7 +408,7 @@ uint32_t sl_output(uint64_t id, void *data, uint32_t cap) {
         memcpy(p+used+8,q->data,q->len); used+=8+q->len;
         s->out_bytes-=q->len; s->out_head=q->next;
         if (!s->out_head) s->out_tail=NULL;
-        free(q);
+        sl_free(q);
     }
     return used;
 }
@@ -353,7 +443,7 @@ int32_t sl_read(uint64_t id, void *data, uint32_t cap, void *address) {
         if (q->offset==q->p->tot_len || c->udp) {
             c->queued-=q->p->tot_len-q->offset; c->packets--;
             c->head=q->next; if (!c->head) c->tail=NULL;
-            pbuf_free(q->p); free(q);
+            pbuf_free(q->p); sl_free(q);
         }
         if (c->udp) break;
     }
@@ -448,8 +538,8 @@ void sl_destroy(uint64_t id) {
     sl_context **pp=&contexts;
     while (*pp!=s) pp=&(*pp)->next;
     *pp=s->next;
-    while (s->out_head) { sl_packet *p=s->out_head; s->out_head=p->next; free(p); }
+    while (s->out_head) { sl_packet *p=s->out_head; s->out_head=p->next; sl_free(p); }
     free(s);
-    if (!contexts) { lwip_fini(); clear_rx(); }
+    if (!contexts) { lwip_fini(); clear_rx(); clear_alloc(); }
     else netif_set_default(&contexts->iface);
 }

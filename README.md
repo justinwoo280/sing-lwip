@@ -152,6 +152,12 @@ Linux RISC-V PureGo likewise needs `-ldflags '-I /lib/ld-linux-riscv64-lp64d.so.
 The default native connection limit is 16384 per instance, configurable through `Options.MaxConnections`.
 Callbacks from C enqueue events for Go; they do not call back into Go directly. Native code never retains a Go buffer pointer.
 
+The native core reuses allocations through a lazy, process-wide cache capped at
+4 MiB (at most 2 MiB per size class), in addition to the large receive-buffer cache.
+Buffers return to the cache only after their final native reference is released.
+Closing the last stack releases both caches. This also covers transmit pbufs and
+output records, avoiding repeated allocation and page reclamation during transfers.
+
 ### Output buffers and TCP GSO
 
 `ReadPacketBatch` needs a buffer of at least **65543 bytes**. Packet data borrows that buffer until it is reused.
