@@ -21,10 +21,7 @@ func windowsCommand(root string, args []string) error {
 	if (*arch != "amd64" && *arch != "arm64") || *destination == "" {
 		return fmt.Errorf("windows requires --arch amd64|arm64 and --output PATH")
 	}
-	if _, err := verifyLWIPSource(root); err != nil {
-		return err
-	}
-	if err := generateChecksums(root, true); err != nil {
+	if err := generateCommand(root, []string{"--check"}); err != nil {
 		return err
 	}
 	sdkPath, err := filepath.Abs(*sdk)

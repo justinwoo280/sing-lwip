@@ -96,12 +96,38 @@ func verifyLWIPSource(root string) (sourceLock, error) {
 	}
 	files, err := readSourceSnapshot(filepath.Join(root, "third_party/lwip"))
 	if err != nil {
-		return lock, err
+		return lock, fmt.Errorf("lwIP source cache unavailable; run go run ./cmd/build-lwip sync-lwip: %w", err)
 	}
 	if sourceTreeHash(files) != lock.TreeSHA256 {
 		return lock, fmt.Errorf("lwIP sources differ from %s; commit native changes to the lwIP fork, then sync its revision", sourceLockFile)
 	}
 	return lock, nil
+}
+
+// Download only the locked commit when the ignored source cache is absent.
+// Every reuse verifies its contents; edited or corrupt caches are never silently
+// overwritten, and preparing a build never changes the lock or generated files.
+func ensureLWIPSource(root string) (sourceLock, error) {
+	lock, err := readSourceLock(root)
+	if err != nil {
+		return lock, err
+	}
+	if _, err := os.Lstat(filepath.Join(root, "third_party/lwip")); err == nil {
+		return verifyLWIPSource(root)
+	} else if !os.IsNotExist(err) {
+		return lock, err
+	}
+	files, err := fetchSourceSnapshot(lock.Repository, lock.Revision)
+	if err != nil {
+		return lock, err
+	}
+	if sourceTreeHash(files) != lock.TreeSHA256 {
+		return lock, fmt.Errorf("lwIP repository commit does not match the locked source tree")
+	}
+	if err := installSourceSnapshot(root, lock, files, false); err != nil {
+		return lock, err
+	}
+	return verifyLWIPSource(root)
 }
 
 func fetchSourceSnapshot(repository, revision string) (map[string][]byte, error) {
@@ -160,7 +186,7 @@ func fetchSourceSnapshot(repository, revision string) (map[string][]byte, error)
 func syncSourceCommand(root string, args []string) error {
 	flags := flag.NewFlagSet("sync-lwip", flag.ContinueOnError)
 	revision := flags.String("revision", "", "full commit SHA to pin (default: current lock)")
-	check := flags.Bool("check", false, "verify the checked-in source snapshot without changing files")
+	check := flags.Bool("check", false, "verify the source cache without changing files")
 	remote := flags.Bool("remote", false, "also fetch and verify the pinned repository commit")
 	if err := parseFlags(flags, args); err != nil {
 		return err
@@ -168,13 +194,20 @@ func syncSourceCommand(root string, args []string) error {
 	if *check && *revision != "" {
 		return fmt.Errorf("--check cannot update --revision")
 	}
+	if !*check && !*remote && *revision == "" {
+		lock, err := ensureLWIPSource(root)
+		if err == nil {
+			fmt.Println("Prepared lwIP", lock.Repository, lock.Revision, lock.TreeSHA256)
+		}
+		return err
+	}
 	lock, err := readSourceLock(root)
 	if err != nil {
 		return err
 	}
 	target := filepath.Join(root, "third_party/lwip")
 	// Preserve local edits. Updates begin from a verified snapshot or an absent one.
-	if _, err := os.Stat(target); err == nil || *check {
+	if _, err := os.Lstat(target); err == nil {
 		if _, err := verifyLWIPSource(root); err != nil {
 			return err
 		}
@@ -182,6 +215,9 @@ func syncSourceCommand(root string, args []string) error {
 		return err
 	}
 	if *check && !*remote {
+		if _, err := verifyLWIPSource(root); err != nil {
+			return err
+		}
 		fmt.Println("Verified lwIP", lock.Revision, lock.TreeSHA256)
 		return nil
 	}
@@ -198,18 +234,20 @@ func syncSourceCommand(root string, args []string) error {
 	}
 	if !*check {
 		lock.TreeSHA256 = digest
-		if err := installSourceSnapshot(root, lock, files); err != nil {
+		if err := installSourceSnapshot(root, lock, files, *revision != ""); err != nil {
 			return err
 		}
-		if err := generateCommand(root, nil); err != nil {
-			return err
+		if *revision != "" {
+			if err := generateCommand(root, nil); err != nil {
+				return err
+			}
 		}
 	}
 	fmt.Println("Verified lwIP", lock.Repository, lock.Revision, digest)
 	return nil
 }
 
-func installSourceSnapshot(root string, lock sourceLock, files map[string][]byte) error {
+func installSourceSnapshot(root string, lock sourceLock, files map[string][]byte, updateLock bool) error {
 	parent := filepath.Join(root, "third_party")
 	directory, err := os.MkdirTemp(parent, ".lwip-sync-")
 	if err != nil {
@@ -226,13 +264,15 @@ func installSourceSnapshot(root string, lock sourceLock, files map[string][]byte
 			return err
 		}
 	}
-	data, err := json.MarshalIndent(lock, "", "  ")
-	if err != nil {
-		return err
-	}
 	lockFile := filepath.Join(directory, "lock.json")
-	if err := os.WriteFile(lockFile, append(data, '\n'), 0o644); err != nil {
-		return err
+	if updateLock {
+		data, err := json.MarshalIndent(lock, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(lockFile, append(data, '\n'), 0o644); err != nil {
+			return err
+		}
 	}
 	backup := filepath.Join(directory, "previous")
 	if err := os.Rename(target, backup); err != nil && !os.IsNotExist(err) {
@@ -241,6 +281,9 @@ func installSourceSnapshot(root string, lock sourceLock, files map[string][]byte
 	if err := os.Rename(payload, target); err != nil {
 		_ = os.Rename(backup, target)
 		return err
+	}
+	if !updateLock {
+		return nil
 	}
 	err = os.Rename(lockFile, filepath.Join(root, sourceLockFile))
 	if err != nil {

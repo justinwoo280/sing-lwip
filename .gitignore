@@ -12,3 +12,5 @@
 /lib/
 /prebuilt_*.go
 /toolchains/
+/third_party/lwip/
+/third_party/.lwip-sync-*/

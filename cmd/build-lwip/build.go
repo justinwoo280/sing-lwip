@@ -47,11 +47,11 @@ func buildCommand(root string, args []string) error {
 	if err != nil {
 		return err
 	}
-	source, err := verifyLWIPSource(root)
+	source, err := ensureLWIPSource(root)
 	if err != nil {
 		return err
 	}
-	if err := generateChecksums(root, true); err != nil {
+	if err := generateCommand(root, []string{"--check"}); err != nil {
 		return err
 	}
 	if *destination == "" || (*libc != "gnu" && *libc != "musl") {

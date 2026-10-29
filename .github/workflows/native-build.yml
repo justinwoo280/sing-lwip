@@ -37,7 +37,7 @@ jobs:
       - name: Check tooling and generated sources
         run: |
           test -z "$(gofmt -l .)"
-          go run ./cmd/build-lwip sync-lwip --check --remote
+          go run ./cmd/build-lwip sync-lwip
           go vet ./cmd/build-lwip
           go test ./cmd/build-lwip
           go run ./cmd/build-lwip generate --check
@@ -71,6 +71,7 @@ jobs:
       - name: Check source and publisher compatibility
         run: |
           go version
+          go run ./cmd/build-lwip sync-lwip
           go test ./...
           go run ./cmd/build-lwip generate --check
       - name: Install ARMv7 runtime
@@ -258,7 +259,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .cache/ccache
-          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.triple }}-${{ steps.sdk.outputs.version }}-${{ hashFiles('bridge.*', 'checksum*.h', 'lwipopts.h', 'lwip_*.c', 'third_party/lwip/src/**') }}
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.triple }}-${{ steps.sdk.outputs.version }}-${{ hashFiles('bridge.*', 'checksum*.h', 'lwipopts.h', 'lwip_*.c', 'third_party/lwip.lock.json') }}
           restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.triple }}-${{ steps.sdk.outputs.version }}-
       - name: Build and test
         env:
@@ -327,7 +328,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .cache/ccache
-          key: ccache-android-${{ matrix.arch }}-ndkr28-${{ hashFiles('bridge.*', 'checksum*.h', 'lwipopts.h', 'lwip_*.c', 'third_party/lwip/src/**') }}
+          key: ccache-android-${{ matrix.arch }}-ndkr28-${{ hashFiles('bridge.*', 'checksum*.h', 'lwipopts.h', 'lwip_*.c', 'third_party/lwip.lock.json') }}
           restore-keys: ccache-android-${{ matrix.arch }}-ndkr28-
       - name: Build static library and Android test executable
         env:
