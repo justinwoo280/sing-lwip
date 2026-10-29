@@ -10,6 +10,8 @@
 #endif
 #endif
 #include "third_party/lwip/src/ports/include/lwipopts.h"
+uint16_t sl_checksum_copy(void *destination, const void *source, uint16_t length);
+#define LWIP_CHKSUM_COPY sl_checksum_copy
 /* The serialized embedding owns a bounded allocation cache. Keep it separate
  * from the vendored port and from libc allocations made by the application. */
 #ifndef SING_LWIP_STANDALONE

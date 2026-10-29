@@ -30,10 +30,10 @@ func testNativeCommand(root string, args []string) error {
 	}
 	defer os.RemoveAll(directory)
 	// abi.c is a shared-library FFI fixture, not an executable C regression.
-	for _, name := range []string{"allocator", "gso", "rx_buffer", "udp_netif"} {
+	for _, name := range []string{"checksum", "allocator", "gso", "rx_buffer", "udp_netif"} {
 		binary := filepath.Join(directory, name)
 		command := []string{"-O1", "-g", "-fsanitize=address,undefined", "-fno-omit-frame-pointer"}
-		if name == "udp_netif" {
+		if name == "udp_netif" || name == "checksum" {
 			command = append(command, "-DSING_LWIP_STANDALONE")
 		}
 		command = append(command, includes(root)...)
