@@ -201,6 +201,15 @@ Buffers return to the cache only after their final native reference is released.
 Closing the last stack releases both caches. This also covers transmit pbufs and
 output records, avoiding repeated allocation and page reclamation during transfers.
 
+The binding avoids redundant event-drain calls on short batches, would-block
+operations and UDP reads. Deadline changes wake the corresponding direction.
+These optimizations also work with earlier ABI-2 libraries.
+
+`Conn.ReadBatch` reads a TCP stream into up to 16 caller-owned buffers while
+holding the native core once. It waits for the first available bytes and then
+drains only already queued data, allowing consumers to use vectored socket writes
+without adding a batching delay. It uses the existing ABI-2 read entry point.
+
 ### Output buffers and TCP GSO
 
 `ReadPacketBatch` needs a buffer of at least **65543 bytes**. Packet data borrows that buffer until it is reused.
