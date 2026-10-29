@@ -201,10 +201,7 @@ func (s *Stack) ReadPacketBatch(buffer []byte, packets []Packet) ([]Packet, erro
 }
 
 func (s *Stack) pump() {
-	select {
-	case s.outputWake <- struct{}{}:
-	default:
-	}
+	s.wakeOutput()
 	for {
 		n := core.a.drain(s.id, unsafe.Pointer(&s.events[0]), uint32(len(s.events)))
 		if n == 0 {
@@ -226,6 +223,19 @@ func (s *Stack) pump() {
 				}
 			}
 		}
+		// ABI-2 drain reserves 56 bytes for the largest event before each
+		// iteration. A shorter batch exhausted the queue while core is held;
+		// avoid a second native call just to obtain an empty result.
+		if int(n)+56 <= len(s.events) {
+			return
+		}
+	}
+}
+
+func (s *Stack) wakeOutput() {
+	select {
+	case s.outputWake <- struct{}{}:
+	default:
 	}
 }
 

@@ -40,13 +40,20 @@ func (c *Conn) RemoteAddr() net.Addr {
 	return net.TCPAddrFromAddrPort(c.destination)
 }
 func (c *Conn) wake() {
-	select {
-	case c.readWake <- struct{}{}:
-	default:
+	c.wakeReady(3)
+}
+func (c *Conn) wakeReady(mask uint32) {
+	if mask&1 != 0 {
+		select {
+		case c.readWake <- struct{}{}:
+		default:
+		}
 	}
-	select {
-	case c.writeWake <- struct{}{}:
-	default:
+	if mask&2 != 0 {
+		select {
+		case c.writeWake <- struct{}{}:
+		default:
+		}
 	}
 }
 func wait(wake <-chan struct{}, deadline time.Time) error {
@@ -94,7 +101,11 @@ func (c *Conn) read(p []byte, address *[40]byte) (int, error) {
 		n := core.a.read(c.id, pointer(p), uint32(len(p)), unsafe.Pointer(address))
 		runtime.KeepAlive(p)
 		runtime.KeepAlive(address)
-		c.s.pump()
+		// A would-block/EOF/error read does not change native state. Avoid an
+		// extra FFI drain and output notification before parking the reader.
+		if n > 0 && !c.udp {
+			c.s.pump()
+		}
 		core.Unlock()
 		if n > 0 || (n == 0 && c.udp) {
 			return int(n), nil
@@ -150,7 +161,9 @@ func (c *Conn) write(p []byte, address *[40]byte) (int, error) {
 		n := core.a.write(c.id, pointer(remaining), uint32(len(remaining)), unsafe.Pointer(address))
 		runtime.KeepAlive(p)
 		runtime.KeepAlive(address)
-		c.s.pump()
+		if n >= 0 {
+			c.s.pump()
+		}
 		core.Unlock()
 		if n >= 0 {
 			total += int(n)
@@ -294,7 +307,7 @@ func (c *Conn) SetReadDeadline(t time.Time) error {
 		return net.ErrClosed
 	}
 	c.readDeadline = t
-	c.wake()
+	c.wakeReady(1)
 	return nil
 }
 func (c *Conn) SetWriteDeadline(t time.Time) error {
@@ -304,6 +317,6 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 		return net.ErrClosed
 	}
 	c.writeDeadline = t
-	c.wake()
+	c.wakeReady(2)
 	return nil
 }

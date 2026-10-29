@@ -96,7 +96,7 @@ func TestPublishPinnedGraphAndHistory(t *testing.T) {
 	for _, name := range []string{"bridge.c", "lwip_core.c"} {
 		write(filepath.Join(root, name), "//go:build cgo && !with_lwip_prebuilt\n\n/* fixture */\n")
 	}
-	for _, name := range []string{"bridge.h", "lwipopts.h", "third_party/lwip/src/fixture.h", "LICENSE", "third_party/lwip/LICENSE"} {
+	for _, name := range []string{"bridge.h", "lwipopts.h", "checksum.h", "checksum_generated.h", "third_party/lwip/src/fixture.h", "LICENSE", "third_party/lwip/LICENSE"} {
 		write(filepath.Join(root, name), "/* fixture */\n")
 	}
 	snapshot, err := readSourceSnapshot(filepath.Join(root, "third_party/lwip"))

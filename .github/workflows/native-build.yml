@@ -84,6 +84,7 @@ jobs:
           go run ./cmd/build-lwip build --target linux/arm \
             --cc 'zig cc -target arm-linux-gnueabihf.2.17' --ar 'zig ar' \
             --output dist/compat --tests
+          qemu-arm -L /usr/arm-linux-gnueabihf dist/compat/checksum.test
           qemu-arm -L /usr/arm-linux-gnueabihf dist/compat/cgo.test -test.v
           SING_LWIP_LIBRARY="$PWD/dist/compat/libsing-lwip.so" \
           SING_LWIP_ABI_FIXTURE="$PWD/dist/compat/abi-fixture.so" \
@@ -151,6 +152,7 @@ jobs:
               fi
             fi
             "${runner[@]}" "$out/cgo.test" -test.v
+            "${runner[@]}" "$out/checksum.test"
             if [ -f "$out/purego.test" ]; then
               SING_LWIP_LIBRARY="$PWD/$out/libsing-lwip.so" \
               SING_LWIP_ABI_FIXTURE="$PWD/$out/abi-fixture.so" \
@@ -222,6 +224,8 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           $dir = Join-Path $PWD "dist/windows_$env:ARCH"
+          & "$dir/checksum.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$dir/cgo.exe" '-test.v'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:SING_LWIP_LIBRARY = Join-Path $dir 'sing-lwip.dll'
@@ -254,7 +258,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .cache/ccache
-          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.triple }}-${{ steps.sdk.outputs.version }}-${{ hashFiles('bridge.*', 'lwipopts.h', 'lwip_*.c', 'third_party/lwip/src/**') }}
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.triple }}-${{ steps.sdk.outputs.version }}-${{ hashFiles('bridge.*', 'checksum*.h', 'lwipopts.h', 'lwip_*.c', 'third_party/lwip/src/**') }}
           restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.triple }}-${{ steps.sdk.outputs.version }}-
       - name: Build and test
         env:
@@ -271,6 +275,7 @@ jobs:
           go run ./cmd/build-lwip build --target "$TARGET" --cc "$cc" --ar 'xcrun ar' \
             --output "$out" --version "${GITHUB_SHA:0:12}" "${extra[@]}"
           if [ "$RUN_TESTS" = true ]; then
+            "$out/checksum.test"
             "$out/cgo.test" -test.v
             SING_LWIP_LIBRARY="$PWD/$out/libsing-lwip.dylib" \
             SING_LWIP_ABI_FIXTURE="$PWD/$out/abi-fixture.dylib" "$out/purego.test" -test.v
@@ -322,7 +327,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .cache/ccache
-          key: ccache-android-${{ matrix.arch }}-ndkr28-${{ hashFiles('bridge.*', 'lwipopts.h', 'lwip_*.c', 'third_party/lwip/src/**') }}
+          key: ccache-android-${{ matrix.arch }}-ndkr28-${{ hashFiles('bridge.*', 'checksum*.h', 'lwipopts.h', 'lwip_*.c', 'third_party/lwip/src/**') }}
           restore-keys: ccache-android-${{ matrix.arch }}-ndkr28-
       - name: Build static library and Android test executable
         env:

@@ -51,6 +51,9 @@ func buildCommand(root string, args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := generateChecksums(root, true); err != nil {
+		return err
+	}
 	if *destination == "" || (*libc != "gnu" && *libc != "musl") {
 		return fmt.Errorf("build requires --output DIR and --libc gnu|musl")
 	}
@@ -165,6 +168,17 @@ func buildCommand(root string, args []string) error {
 		}
 	}
 	if *tests {
+		name := "checksum.test"
+		if t.GOOS == "windows" {
+			name = "checksum.exe"
+		}
+		command := append(append([]string(nil), cflags...), filepath.Join(root, "tests/checksum.c"))
+		command = append(command, objects...)
+		command = append(command, ldflags...)
+		command = append(command, "-o", filepath.Join(out, name))
+		if err := run(root, nil, cc, command...); err != nil {
+			return err
+		}
 		if err := buildTests(root, out, *compiler, t, *staticOnly); err != nil {
 			return err
 		}
@@ -304,7 +318,7 @@ func nativeFingerprint(root string) (string, error) {
 		return "", err
 	}
 	paths = append(paths, units...)
-	for _, name := range []string{"bridge.c", "bridge.h", "lwipopts.h"} {
+	for _, name := range []string{"bridge.c", "bridge.h", "lwipopts.h", "checksum.h", "checksum_generated.h"} {
 		paths = append(paths, filepath.Join(root, name))
 	}
 	sort.Slice(paths, func(i, j int) bool { return filepath.ToSlash(paths[i]) < filepath.ToSlash(paths[j]) })

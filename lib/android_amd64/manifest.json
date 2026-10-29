@@ -1,21 +1,21 @@
 {
   "abi": 2,
-  "version": "31e92e4a08d5",
+  "version": "d7aafffcecc0",
   "target": "android/amd64",
   "purego": false,
   "purego_requires_cgo": true,
-  "source_revision": "31e92e4a08d51a4feb30f2936264831df6e38d39",
+  "source_revision": "d7aafffcecc0b0906ff9b9afc90e6870444b379d",
   "lwip_source": {
     "repository": "https://github.com/justinwoo280/lwip.git",
     "revision": "02541e94fc3b0d4cbd0db33d7c610bd7f1b1086d",
     "tree_sha256": "8d432409ade489625ec38eac5e8e17bad5e61209772a1d521674885156186821"
   },
-  "native_source_sha256": "46c800d90d992106d7f6ec282c2fba8d6a587df663defb423fa3d7f55fbf3a9c",
+  "native_source_sha256": "34fd4177cf1a19694a2cf088c65c9586b8ddf62399fec719295adad9a6c8a5bc",
   "compiler": "Android (12896553, +pgo, +bolt, +lto, +mlgo, based on r530567c) clang version 19.0.0 (https://android.googlesource.com/toolchain/llvm-project 97a699bf4812a18fb657c2779f5296a4ab2694d2)",
   "files": {
     "LICENSE": "690697ca6c0b42113e59f87d2963d446365a42a07cf08e5bc460569edf2c8a2a",
     "LWIP-LICENSE": "ef4aac92e05e87cd1cdc140870ed52206ba03d4a7fe46c1e11d7ffa6c87d252b",
     "bridge.h": "08e95d5d89a1b026e245fe2586d1d9dacb11624749db9c9c1e59bbcb4adfd7b7",
-    "libsing-lwip.a": "01249448e403891a5fa8a87f945511202f05abd1f4b2d3167ff9b92ec6c3f075"
+    "libsing-lwip.a": "f603492d4b3e3c82dc9af15c6c5c9487372b212f70eac0bb17fa9302f776ee66"
   }
 }

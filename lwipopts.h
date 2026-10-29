@@ -1,6 +1,7 @@
 #ifndef SING_LWIP_OPTIONS_H
 #define SING_LWIP_OPTIONS_H
 #include <stdint.h>
+#include <stddef.h>
 #if defined(__ANDROID__)
 /* Current bionic provides fd_set; disable the legacy port's duplicate typedef. */
 #include <sys/select.h>
@@ -9,6 +10,21 @@
 #endif
 #endif
 #include "third_party/lwip/src/ports/include/lwipopts.h"
+uint16_t sl_checksum_copy(void *destination, const void *source, uint16_t length);
+#define LWIP_CHKSUM_COPY sl_checksum_copy
+/* The serialized embedding owns a bounded allocation cache. Keep it separate
+ * from the vendored port and from libc allocations made by the application. */
+#ifndef SING_LWIP_STANDALONE
+void *sl_alloc(size_t size);
+void *sl_calloc(size_t count, size_t size);
+void sl_free(void *pointer);
+#undef MEM_CUSTOM_MALLOC
+#undef MEM_CUSTOM_CALLOC
+#undef MEM_CUSTOM_FREE
+#define MEM_CUSTOM_MALLOC sl_alloc
+#define MEM_CUSTOM_CALLOC sl_calloc
+#define MEM_CUSTOM_FREE sl_free
+#endif
 /* Windows uses LLP64: pointers are 64-bit without __LP64__. Reassembly's
  * pointer-bearing helper must not overwrite the eight-byte fragment header. */
 #if UINTPTR_MAX > UINT32_MAX
