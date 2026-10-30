@@ -151,7 +151,10 @@ func fetchSourceSnapshot(repository, revision string) (map[string][]byte, error)
 	if head != revision {
 		return nil, fmt.Errorf("lwIP fetch resolved %s, expected %s", head, revision)
 	}
-	data, err := process(directory, nil, []string{"git"}, "archive", "--format=tar", head, "LICENSE", "src").Output()
+	// git archive applies checkout EOL conversion even without a worktree.
+	// Override host defaults (notably Git for Windows' core.autocrlf=true)
+	// so the same commit produces the same locked source bytes on every host.
+	data, err := process(directory, nil, []string{"git"}, "-c", "core.autocrlf=false", "-c", "core.eol=lf", "archive", "--format=tar", head, "LICENSE", "src").Output()
 	if err != nil {
 		return nil, fmt.Errorf("archive lwIP commit: %w", err)
 	}

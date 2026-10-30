@@ -1,10 +1,10 @@
 {
   "abi": 2,
-  "version": "179ced706d96",
+  "version": "d0de5c902dc4",
   "target": "freebsd/amd64",
   "purego": true,
   "purego_requires_cgo": false,
-  "source_revision": "179ced706d96358edb2d5409f6b16384c318de45",
+  "source_revision": "d0de5c902dc461ed52ffd42c3ca875705fc981eb",
   "lwip_source": {
     "repository": "https://github.com/justinwoo280/lwip.git",
     "revision": "02541e94fc3b0d4cbd0db33d7c610bd7f1b1086d",

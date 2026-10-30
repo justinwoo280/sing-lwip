@@ -10,6 +10,71 @@ import (
 	"testing"
 )
 
+func TestSourceSnapshotIgnoresHostLineEndings(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git unavailable")
+	}
+	repository := t.TempDir()
+	git := func(args ...string) string {
+		t.Helper()
+		text, err := output(repository, []string{"git"}, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return text
+	}
+	git("init", "-b", "main")
+	git("config", "user.name", "Source Test")
+	git("config", "user.email", "source@example.invalid")
+	git("config", "core.autocrlf", "false")
+	git("config", "core.eol", "lf")
+	if err := os.Mkdir(filepath.Join(repository, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Attributes make core.eol observable independently of core.autocrlf.
+	// Explicitly binary/CRLF blobs must stay byte-for-byte intact, not be
+	// "repaired" by normalizing archive contents after the fact.
+	attributes := "*.c text\nsrc/raw.bin -text\nsrc/keep-crlf.txt -text\n"
+	if err := os.WriteFile(filepath.Join(repository, ".gitattributes"), []byte(attributes), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string][]byte{
+		"LICENSE":           []byte("test license\n"),
+		"src/core.c":        []byte("int value = 1;\nint other = 2;\n"),
+		"src/raw.bin":       {0, 10, 13, 10, 255},
+		"src/keep-crlf.txt": []byte("committed CRLF\r\n"),
+	}
+	for name, data := range want {
+		if err := os.WriteFile(filepath.Join(repository, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git("add", ".")
+	git("commit", "-m", "source with explicit line endings")
+	revision := git("rev-parse", "HEAD")
+	for _, autocrlf := range []string{"true", "false", "input"} {
+		t.Run(autocrlf, func(t *testing.T) {
+			t.Setenv("GIT_CONFIG_COUNT", "2")
+			t.Setenv("GIT_CONFIG_KEY_0", "core.autocrlf")
+			t.Setenv("GIT_CONFIG_VALUE_0", autocrlf)
+			t.Setenv("GIT_CONFIG_KEY_1", "core.eol")
+			t.Setenv("GIT_CONFIG_VALUE_1", "crlf")
+			got, err := fetchSourceSnapshot(repository, revision)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != len(want) || sourceTreeHash(got) != sourceTreeHash(want) {
+				t.Fatal("host line-ending configuration changed the source tree")
+			}
+			for name, data := range want {
+				if !bytes.Equal(got[name], data) {
+					t.Fatalf("source bytes changed: %s", name)
+				}
+			}
+		})
+	}
+}
+
 func TestPrepareSourceCache(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git unavailable")
