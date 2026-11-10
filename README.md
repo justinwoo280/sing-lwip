@@ -32,8 +32,8 @@ sources or a static archive. Static linkage here refers to sing-lwip; system-lib
 | Target | CGO binding | PureGo loader | C-built native artifacts |
 |---|---|---|---|
 | Linux glibc: amd64, arm64, 386, arm, loong64, ppc64le, riscv64 | Yes | Yes | `.a`, `.so` |
-| Linux glibc: mipsle, mips64le | Yes | — | `.a`, `.so` |
-| Linux musl: amd64, arm64, 386, arm, loong64, ppc64le, riscv64, mipsle | Yes | — | `.a` |
+| Linux glibc: mipsle, mips64le, s390x | Yes | — | `.a`, `.so` |
+| Linux musl: amd64, arm64, 386, arm, loong64, ppc64le, riscv64, mipsle, s390x | Yes | — | `.a` |
 | macOS: amd64, arm64 | Yes | Yes | `.a`, `.dylib` |
 | Windows: 386, amd64, arm64 | MinGW | Yes | `.a`, `.dll` |
 | Android: 386, amd64, arm, arm64 | Yes | — | `.a` |
@@ -84,6 +84,7 @@ use the same lwIP checksum hook in source-CGO, prebuilt-CGO and PureGo libraries
 | amd64 | Generated SSE2 assembly (baseline amd64 instructions) |
 | 386 with SSE2 enabled | Generated SSE2 assembly |
 | ARM32 with NEON enabled | Generated NEON assembly |
+| s390x with the Vector Facility enabled (z13+) | Generated VX assembly |
 | Other targets, including non-NEON ARMv7 | Portable, unaligned-safe C |
 
 The generated header uses C extended assembly so the compiler handles each
@@ -104,7 +105,8 @@ includes both checksum headers.
 
 Instruction selection follows **target compiler features**, not the build host's
 CPU. Standard ARMv7 builds retain their existing CPU requirements; NEON requires
-an explicit compatible target. For diagnostic comparisons, define
+an explicit compatible target. s390x selects VX when the compiler defines
+`__VX__`; older targets use portable C. For diagnostic comparisons, define
 `SING_LWIP_CHECKSUM_GENERIC` in `CFLAGS` for native libraries, or `CGO_CFLAGS` for
 source-CGO builds, to force the portable implementation.
 Define `SING_LWIP_CHECKSUM_COPY_SEPARATE` to disable only the fused copy kernel
@@ -267,6 +269,57 @@ the PureGo test executable. Run CGO tests on FreeBSD with `devel/binutils` insta
 
 `CC`, `AR`, `CFLAGS`, `CPPFLAGS` and `LDFLAGS` are supported. The compiler selects the actual libc;
 `--libc gnu|musl` records the Linux artifact variant. The builder verifies the emitted binary's architecture and byte order.
+
+### IBM Z / LinuxONE (s390x)
+
+Linux s390x uses the **CGO** binding. Targets with the z13 Vector Facility use
+generated assembly for checksums and fused copy/checksum; older targets use
+portable C. The kernels use `VSUMH` to widen native-order halfword pairs, `VAF`
+to accumulate without losing carries, and `VSUMQF` for the final reduction.
+The target is 64-bit big-endian; ABI-2 metadata remains explicitly little-endian,
+while IP packets retain network byte order. Both glibc (`.a`, `.so`) and musl
+(`.a`) are included in the build and publication matrix. PureGo is not available
+for this architecture.
+
+On a native s390x Linux system with Go, Git and a C compiler installed:
+
+```sh
+go run ./cmd/build-lwip sync-lwip
+CGO_ENABLED=1 go test ./...
+go run ./cmd/build-lwip build --target linux/s390x --output dist/linux_s390x_gnu --tests
+dist/linux_s390x_gnu/cgo.test -test.v
+dist/linux_s390x_gnu/checksum.test
+```
+
+To explicitly target z13 or newer with GCC/Clang, use
+`CGO_CFLAGS='-O3 -march=z13'` for source-CGO, or `CFLAGS='-O3 -march=z13'`
+for the native builder. Selection is compile-time: the resulting binary
+requires the selected CPU facilities. There is no runtime ISA dispatch.
+
+Cross-build with Zig 0.15.2 and run using QEMU plus a target glibc runtime
+(`qemu-user` and `libc6-s390x-cross` on Debian/Ubuntu):
+
+```sh
+go run ./cmd/build-lwip build --target linux/s390x \
+  --cc 'zig cc -target s390x-linux-gnu.2.17' --ar 'zig ar' \
+  --output dist/linux_s390x_gnu --tests
+qemu-s390x -L /usr/s390x-linux-gnu dist/linux_s390x_gnu/cgo.test -test.v
+qemu-s390x -L /usr/s390x-linux-gnu dist/linux_s390x_gnu/checksum.test
+```
+
+For musl, use `--libc musl --static-only` with `-target s390x-linux-musl`;
+the static test executables run under `qemu-s390x` without a glibc sysroot.
+GCC cross-builds can use `--cc s390x-linux-gnu-gcc --ar s390x-linux-gnu-ar`;
+their libc requirements follow that toolchain's sysroot.
+For a Zig VX build, add `-mcpu=z13` to the compiler command above. The default
+Zig s390x target retains the portable implementation.
+
+CI runs the existing TCP/UDP, IPv4/IPv6, GSO, reassembly, lifecycle and checksum
+regressions under QEMU for both libc variants, plus explicit z13 VX, forced
+generic and separate-copy checks. The kernels are also validated on native
+LinuxONE with GCC and Clang, including big-endian checksum oracles, alignment,
+overflow, guard-page and sanitizer checks. These in-memory tests need neither
+root privileges nor a TUN device.
 
 ### Windows MSVC DLLs with xwin
 

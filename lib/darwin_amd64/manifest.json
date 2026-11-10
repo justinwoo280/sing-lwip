@@ -1,22 +1,22 @@
 {
   "abi": 2,
-  "version": "d0de5c902dc4",
+  "version": "07e9ef658da6",
   "target": "darwin/amd64",
   "purego": true,
   "purego_requires_cgo": false,
-  "source_revision": "d0de5c902dc461ed52ffd42c3ca875705fc981eb",
+  "source_revision": "07e9ef658da6ab3351f6ffc4ca3bb9a5b4f37a2a",
   "lwip_source": {
     "repository": "https://github.com/justinwoo280/lwip.git",
     "revision": "02541e94fc3b0d4cbd0db33d7c610bd7f1b1086d",
     "tree_sha256": "8d432409ade489625ec38eac5e8e17bad5e61209772a1d521674885156186821"
   },
-  "native_source_sha256": "34fd4177cf1a19694a2cf088c65c9586b8ddf62399fec719295adad9a6c8a5bc",
+  "native_source_sha256": "24c82678a16719af22af6427010263b52ae42d3b8017ec0213afdced068cdc19",
   "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)",
   "files": {
     "LICENSE": "690697ca6c0b42113e59f87d2963d446365a42a07cf08e5bc460569edf2c8a2a",
     "LWIP-LICENSE": "ef4aac92e05e87cd1cdc140870ed52206ba03d4a7fe46c1e11d7ffa6c87d252b",
     "bridge.h": "08e95d5d89a1b026e245fe2586d1d9dacb11624749db9c9c1e59bbcb4adfd7b7",
-    "libsing-lwip.a": "447d9bde78316ec51bccba7a45829d2033a82c2d10d05bd8e882ede1c2d6c0df",
+    "libsing-lwip.a": "3dde6bc28b15dcc68b1e823c33e032a6aa73089e9472103461e251e89f625ab8",
     "libsing-lwip.dylib": "c23f0687c8574acde3da3c642a0009aa9231085919476c22fc8e96d7df6fce7b"
   }
 }

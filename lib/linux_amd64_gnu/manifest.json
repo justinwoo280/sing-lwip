@@ -1,23 +1,23 @@
 {
   "abi": 2,
-  "version": "d0de5c902dc4",
+  "version": "07e9ef658da6",
   "target": "linux/amd64",
   "libc": "gnu",
   "purego": true,
   "purego_requires_cgo": false,
-  "source_revision": "d0de5c902dc461ed52ffd42c3ca875705fc981eb",
+  "source_revision": "07e9ef658da6ab3351f6ffc4ca3bb9a5b4f37a2a",
   "lwip_source": {
     "repository": "https://github.com/justinwoo280/lwip.git",
     "revision": "02541e94fc3b0d4cbd0db33d7c610bd7f1b1086d",
     "tree_sha256": "8d432409ade489625ec38eac5e8e17bad5e61209772a1d521674885156186821"
   },
-  "native_source_sha256": "34fd4177cf1a19694a2cf088c65c9586b8ddf62399fec719295adad9a6c8a5bc",
+  "native_source_sha256": "24c82678a16719af22af6427010263b52ae42d3b8017ec0213afdced068cdc19",
   "compiler": "clang version 20.1.2 (https://github.com/ziglang/zig-bootstrap 7ef74e656cf8ddbd6bf891a8475892aa1afa6891)",
   "files": {
     "LICENSE": "690697ca6c0b42113e59f87d2963d446365a42a07cf08e5bc460569edf2c8a2a",
     "LWIP-LICENSE": "ef4aac92e05e87cd1cdc140870ed52206ba03d4a7fe46c1e11d7ffa6c87d252b",
     "bridge.h": "08e95d5d89a1b026e245fe2586d1d9dacb11624749db9c9c1e59bbcb4adfd7b7",
-    "libsing-lwip.a": "28450f81724c833dbd600f4bbd3ea012c9b3923b01bf8643be692b6b899c1f3f",
-    "libsing-lwip.so": "af3f29c9c695b6c56fd4b4107a093128335b5a437bb455d7b8bf2871b6cf1a6f"
+    "libsing-lwip.a": "0e7815f4f4b6496a0ec7be897d75a03bc67163c222247a72f9e2c04e516ce6ef",
+    "libsing-lwip.so": "33f183bebab6b8349da390b8ea231a07fed9b70286c5836d0afb4f0b91044d68"
   }
 }

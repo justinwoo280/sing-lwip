@@ -10,7 +10,7 @@ import (
 // Emit GNU/Clang extended assembly, letting the C compiler manage register
 // allocation and ABI details (ELF, Mach-O, MinGW and clang-cl). Only baseline
 // target features are used: NEON on arm64, SSE2 when enabled by the x86 compiler,
-// and ARM32 NEON only when explicitly enabled by the target toolchain.
+// ARM32 NEON and s390x VX only when enabled by the target toolchain.
 // The same generated header is consumed by source-CGO and native library builds.
 func checksumHeader() string {
 	var out strings.Builder
@@ -41,10 +41,11 @@ func checksumHeader() string {
 		}
 		out.WriteString("    uint32_t sum;\n    __asm__ (\n")
 	}
+	pointerConstraint := "r"
 	end := func(copy bool, clobbers string) {
-		out.WriteString(`        : [p] "+&r" (p), [blocks] "+&r" (blocks), [sum] "=r" (sum)`)
+		fmt.Fprintf(&out, `        : [p] "+&%s" (p), [blocks] "+&r" (blocks), [sum] "=r" (sum)`, pointerConstraint)
 		if copy {
-			out.WriteString(`, [d] "+&r" (d)`)
+			fmt.Fprintf(&out, `, [d] "+&%s" (d)`, pointerConstraint)
 		}
 		fmt.Fprintf(&out, "\n        :\n        : %s, \"cc\", \"memory\");\n    *data = p;\n", clobbers)
 		if copy {
@@ -143,6 +144,56 @@ func checksumHeader() string {
 		asm("vpadd.i32 d0, d0, d0")
 		asm("vmov %[sum], s0")
 		end(copy, `"q0", "q1", "q2", "q3", "q8", "q9", "q10", "q11"`)
+	}
+	out.WriteString(`#elif defined(__s390x__) && defined(__VX__)
+#define SL_CHECKSUM_BLOCKS "vx-s390x"
+/* z13 Vector Facility: VSUMH widens pairs of unsigned halfwords into words.
+ * Its third operand contributes only a halfword, so use zero there and VAF
+ * for full-width accumulation; reusing an accumulator in VSUMH loses carries.
+ * Independent accumulators avoid a loop-carried serial sum. At most 1024
+ * blocks contribute 4096 halfwords per lane, so neither a lane nor the
+ * final uint32 sum can overflow. Big-endian lanes match lwIP's native order.
+ * Only call-clobbered v16..v24 are used; address operands must exclude r0. */
+`)
+	pointerConstraint = "a"
+	for _, copy := range []bool{false, true} {
+		begin(copy)
+		accumulators := 4
+		if copy {
+			accumulators = 2
+		}
+		for i := 0; i < accumulators; i++ {
+			asm("vzero %%%%v%d", 16+i)
+		}
+		asm("vzero %%v24")
+		asm("1:")
+		if copy {
+			asm("vlm %%v20, %%v23, 0(%[p])")
+			asm("vstm %%v20, %%v23, 0(%[d])")
+			asm("la %[d], 64(%[d])")
+		} else {
+			for i := 0; i < 4; i++ {
+				asm("vl %%%%v%d, %d(%%[p])", 20+i, 16*i)
+			}
+		}
+		for i := 0; i < 4; i++ {
+			asm("vsumh %%%%v%d, %%%%v%d, %%%%v24", 20+i, 20+i)
+			asm("vaf %%%%v%d, %%%%v%d, %%%%v%d", 16+i%accumulators, 16+i%accumulators, 20+i)
+		}
+		asm("la %[p], 64(%[p])")
+		asm("brct %[blocks], 1b")
+		asm("vaf %%v16, %%v16, %%v17")
+		if !copy {
+			asm("vaf %%v18, %%v18, %%v19")
+			asm("vaf %%v16, %%v16, %%v18")
+		}
+		asm("vsumqf %%v16, %%v16, %%v24")
+		asm("vlgvf %[sum], %%v16, 3")
+		clobbers := `"v16", "v17", "v20", "v21", "v22", "v23", "v24"`
+		if !copy {
+			clobbers += `, "v18", "v19"`
+		}
+		end(copy, clobbers)
 	}
 	out.WriteString(`#endif
 #endif

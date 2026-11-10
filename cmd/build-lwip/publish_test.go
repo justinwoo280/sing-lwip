@@ -18,6 +18,8 @@ func TestPublishedPlatformSelection(t *testing.T) {
 	}{
 		{"linux_arm64_gnu", "linux arm64"},
 		{"linux_arm64_musl", "linux arm64 with_musl"},
+		{"linux_s390x_gnu", "linux s390x"},
+		{"linux_s390x_musl", "linux s390x with_musl"},
 		{"linux_arm_gnu", "linux arm arm.5 arm.6 arm.7"},
 		{"android_arm64", "android linux arm64"},
 		{"darwin_arm64", "darwin arm64"},

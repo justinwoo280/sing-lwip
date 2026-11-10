@@ -160,6 +160,20 @@ jobs:
               "${runner[@]}" "$out/purego.test" -test.v
             fi
           done
+      - name: Check s390x vector and diagnostic kernels
+        if: matrix.arch == 's390x'
+        run: |
+          for mode in vx generic separate; do
+            export CFLAGS='-O3'
+            if [ "$mode" = generic ]; then CFLAGS+=' -DSING_LWIP_CHECKSUM_GENERIC'; fi
+            if [ "$mode" = separate ]; then CFLAGS+=' -DSING_LWIP_CHECKSUM_COPY_SEPARATE'; fi
+            out="$RUNNER_TEMP/s390x-checksum-$mode"
+            go run ./cmd/build-lwip build --target linux/s390x \
+              --cc 'zig cc -target s390x-linux-gnu.2.17 -mcpu=z13' --ar 'zig ar' \
+              --output "$out" --tests
+            qemu-s390x -L /usr/s390x-linux-gnu "$out/checksum.test"
+            qemu-s390x -L /usr/s390x-linux-gnu "$out/cgo.test" -test.v
+          done
       - name: Native race and sanitizers
         if: matrix.arch == 'amd64'
         run: |
