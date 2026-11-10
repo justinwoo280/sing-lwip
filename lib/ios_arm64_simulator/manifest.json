@@ -1,21 +1,21 @@
 {
   "abi": 2,
-  "version": "07e9ef658da6",
+  "version": "3f7a93a1ed7e",
   "target": "ios/arm64/simulator",
   "purego": false,
   "purego_requires_cgo": false,
-  "source_revision": "07e9ef658da6ab3351f6ffc4ca3bb9a5b4f37a2a",
+  "source_revision": "3f7a93a1ed7e6f591898ae2b6768a2e0ba20679e",
   "lwip_source": {
     "repository": "https://github.com/justinwoo280/lwip.git",
-    "revision": "02541e94fc3b0d4cbd0db33d7c610bd7f1b1086d",
-    "tree_sha256": "8d432409ade489625ec38eac5e8e17bad5e61209772a1d521674885156186821"
+    "revision": "76d269e5196b2e9080e9bf95b9d014c1fc0a8fa0",
+    "tree_sha256": "df26cdd0d5e9bca37caf7afedcfc6403eedccc7e71f12a6fa55f59142d4ded12"
   },
-  "native_source_sha256": "24c82678a16719af22af6427010263b52ae42d3b8017ec0213afdced068cdc19",
+  "native_source_sha256": "065aca5dd2b7aafac3aac079d8a3670de88f08f7a63853012dbfdc2ae4b08641",
   "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)",
   "files": {
     "LICENSE": "690697ca6c0b42113e59f87d2963d446365a42a07cf08e5bc460569edf2c8a2a",
     "LWIP-LICENSE": "ef4aac92e05e87cd1cdc140870ed52206ba03d4a7fe46c1e11d7ffa6c87d252b",
     "bridge.h": "08e95d5d89a1b026e245fe2586d1d9dacb11624749db9c9c1e59bbcb4adfd7b7",
-    "libsing-lwip.a": "4bc4f6b6a7e35838db24e6ca7a033fcf03a5b9ff9f913071711b40999aa92dc7"
+    "libsing-lwip.a": "5507a9073591ac747f257a65a8afa9d0a840a2e168516aa3e7f91f4e95db5e0d"
   }
 }

@@ -16,9 +16,9 @@ Prebuilt CGO and PureGo consumers do not need the source cache.
 ## Current pin
 
 - Base: [`495671e59d736ef59f6cfa7dc9d35b7359921062`](https://github.com/heiher/lwip/commit/495671e59d736ef59f6cfa7dc9d35b7359921062)
-- Pinned fork commit: [`02541e94fc3b0d4cbd0db33d7c610bd7f1b1086d`](https://github.com/justinwoo280/lwip/commit/02541e94fc3b0d4cbd0db33d7c610bd7f1b1086d)
+- Pinned fork commit: [`76d269e5196b2e9080e9bf95b9d014c1fc0a8fa0`](https://github.com/justinwoo280/lwip/commit/76d269e5196b2e9080e9bf95b9d014c1fc0a8fa0)
 
-The fork contains three independently reviewable changes:
+The fork contains these changes:
 
 1. [`adf1ac7`](https://github.com/justinwoo280/lwip/commit/adf1ac750c3b23218f2e2918f0699234c1344f12):
    UDP pretend-PCB lookup respects the ingress netif. Includes a standalone
@@ -29,9 +29,16 @@ The fork contains three independently reviewable changes:
 3. [`02541e9`](https://github.com/justinwoo280/lwip/commit/02541e94fc3b0d4cbd0db33d7c610bd7f1b1086d):
    separate TCP GSO aggregation limits from negotiated wire MSS and let tagged
    aggregates reach the output device without IP fragmentation.
+4. [`76d269e`](https://github.com/justinwoo280/lwip/commit/76d269e5196b2e9080e9bf95b9d014c1fc0a8fa0):
+   include the IPv4 protocol in the shared reassembly/eviction identity and
+   release empty IPv6 reassembly entries when their first fragment is rejected.
+   Packet-level regressions cover protocol isolation, budget exhaustion and cleanup.
 
-Each change was built independently against the pinned upstream base. The UDP
-regression misroutes four datagrams per IP family before its fix and none after.
+The first three changes were built independently against the pinned upstream
+base. The UDP regression misroutes four datagrams per IP family before its fix
+and none after.
+The fragment-identity and rejection-cleanup fixes were verified on native ARM64
+and s390x with GCC, Clang and sanitizers.
 The locked tree digest covers every downloaded source file and its relative path.
 
 ## Updating the dependency
