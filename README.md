@@ -396,11 +396,11 @@ go run ./cmd/build-lwip sync-lwip --check --remote
 
 `sync-lwip --revision` updates the source lock, local cache and CGO source fingerprints together.
 Commit the lock and generated wrappers. Ordinary source preparation leaves these files unchanged.
-Fork commits and the independent UDP, fragment-isolation and GSO changes are documented in
+Fork commits, including the UDP, fragment-reassembly and GSO changes, are documented in
 [third_party/README.md](third_party/README.md).
 
 ## License
 
 BSD-3-Clause. Downloaded lwIP retains its original copyright notices and
-[license](https://github.com/justinwoo280/lwip/blob/02541e94fc3b0d4cbd0db33d7c610bd7f1b1086d/LICENSE).
+[license](https://github.com/justinwoo280/lwip/blob/76d269e5196b2e9080e9bf95b9d014c1fc0a8fa0/LICENSE).
 Native library distributions include it as `LWIP-LICENSE`.
