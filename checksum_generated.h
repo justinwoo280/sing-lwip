@@ -250,6 +250,85 @@ static inline uint32_t sl_checksum_copy_blocks(uint8_t **destination, const uint
     return sum;
 }
 #endif
+#elif defined(__s390x__) && defined(__VX__)
+#define SL_CHECKSUM_BLOCKS "vx-s390x"
+/* z13 Vector Facility: VSUMH widens pairs of unsigned halfwords into words.
+ * Its third operand contributes only a halfword, so use zero there and VAF
+ * for full-width accumulation; reusing an accumulator in VSUMH loses carries.
+ * Independent accumulators avoid a loop-carried serial sum. At most 1024
+ * blocks contribute 4096 halfwords per lane, so neither a lane nor the
+ * final uint32 sum can overflow. Big-endian lanes match lwIP's native order.
+ * Only call-clobbered v16..v24 are used; address operands must exclude r0. */
+static inline uint32_t sl_checksum_blocks(const uint8_t **data, unsigned blocks) {
+    const uint8_t *p = *data;
+    uint32_t sum;
+    __asm__ (
+        "vzero %%v16\n\t"
+        "vzero %%v17\n\t"
+        "vzero %%v18\n\t"
+        "vzero %%v19\n\t"
+        "vzero %%v24\n\t"
+        "1:\n\t"
+        "vl %%v20, 0(%[p])\n\t"
+        "vl %%v21, 16(%[p])\n\t"
+        "vl %%v22, 32(%[p])\n\t"
+        "vl %%v23, 48(%[p])\n\t"
+        "vsumh %%v20, %%v20, %%v24\n\t"
+        "vaf %%v16, %%v16, %%v20\n\t"
+        "vsumh %%v21, %%v21, %%v24\n\t"
+        "vaf %%v17, %%v17, %%v21\n\t"
+        "vsumh %%v22, %%v22, %%v24\n\t"
+        "vaf %%v18, %%v18, %%v22\n\t"
+        "vsumh %%v23, %%v23, %%v24\n\t"
+        "vaf %%v19, %%v19, %%v23\n\t"
+        "la %[p], 64(%[p])\n\t"
+        "brct %[blocks], 1b\n\t"
+        "vaf %%v16, %%v16, %%v17\n\t"
+        "vaf %%v18, %%v18, %%v19\n\t"
+        "vaf %%v16, %%v16, %%v18\n\t"
+        "vsumqf %%v16, %%v16, %%v24\n\t"
+        "vlgvf %[sum], %%v16, 3\n\t"
+        : [p] "+&a" (p), [blocks] "+&r" (blocks), [sum] "=r" (sum)
+        :
+        : "v16", "v17", "v20", "v21", "v22", "v23", "v24", "v18", "v19", "cc", "memory");
+    *data = p;
+    return sum;
+}
+#ifndef SING_LWIP_CHECKSUM_COPY_SEPARATE
+#define SL_CHECKSUM_COPY_BLOCKS 1
+static inline uint32_t sl_checksum_copy_blocks(uint8_t **destination, const uint8_t **data, unsigned blocks) {
+    const uint8_t *p = *data;
+    uint8_t *d = *destination;
+    uint32_t sum;
+    __asm__ (
+        "vzero %%v16\n\t"
+        "vzero %%v17\n\t"
+        "vzero %%v24\n\t"
+        "1:\n\t"
+        "vlm %%v20, %%v23, 0(%[p])\n\t"
+        "vstm %%v20, %%v23, 0(%[d])\n\t"
+        "la %[d], 64(%[d])\n\t"
+        "vsumh %%v20, %%v20, %%v24\n\t"
+        "vaf %%v16, %%v16, %%v20\n\t"
+        "vsumh %%v21, %%v21, %%v24\n\t"
+        "vaf %%v17, %%v17, %%v21\n\t"
+        "vsumh %%v22, %%v22, %%v24\n\t"
+        "vaf %%v16, %%v16, %%v22\n\t"
+        "vsumh %%v23, %%v23, %%v24\n\t"
+        "vaf %%v17, %%v17, %%v23\n\t"
+        "la %[p], 64(%[p])\n\t"
+        "brct %[blocks], 1b\n\t"
+        "vaf %%v16, %%v16, %%v17\n\t"
+        "vsumqf %%v16, %%v16, %%v24\n\t"
+        "vlgvf %[sum], %%v16, 3\n\t"
+        : [p] "+&a" (p), [blocks] "+&r" (blocks), [sum] "=r" (sum), [d] "+&a" (d)
+        :
+        : "v16", "v17", "v20", "v21", "v22", "v23", "v24", "cc", "memory");
+    *data = p;
+    *destination = d;
+    return sum;
+}
+#endif
 #endif
 #endif
 #endif

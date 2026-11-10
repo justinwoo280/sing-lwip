@@ -18,6 +18,7 @@ func buildMatrices() map[string][]map[string]string {
 		{"arch": "arm", "cpu": "arm", "gnu": "gnueabihf.2.17", "runner": "ubuntu-24.04", "qemu": "qemu-arm", "sysroot": "/usr/arm-linux-gnueabihf", "packages": "libc6-armhf-cross qemu-user", "musl": "true"},
 		{"arch": "riscv64", "cpu": "riscv64", "gnu": "gnu.2.27", "runner": "ubuntu-24.04", "qemu": "qemu-riscv64", "sysroot": "/usr/riscv64-linux-gnu", "packages": "libc6-riscv64-cross qemu-user", "musl": "true"},
 		{"arch": "ppc64le", "cpu": "powerpc64le", "gnu": "gnu.2.19", "runner": "ubuntu-24.04", "qemu": "qemu-ppc64le", "sysroot": "/usr/powerpc64le-linux-gnu", "packages": "libc6-ppc64el-cross qemu-user", "musl": "true"},
+		{"arch": "s390x", "cpu": "s390x", "gnu": "gnu.2.17", "runner": "ubuntu-24.04", "qemu": "qemu-s390x", "sysroot": "/usr/s390x-linux-gnu", "packages": "libc6-s390x-cross qemu-user", "musl": "true"},
 		{"arch": "loong64", "cpu": "loongarch64", "gnu": "gnu.2.36", "runner": "ubuntu-24.04", "qemu": "qemu-loongarch64", "sysroot": "", "packages": "qemu-user", "musl": "true"},
 		{"arch": "mipsle", "cpu": "mipsel", "gnu": "gnueabihf.2.17", "runner": "ubuntu-24.04", "qemu": "qemu-mipsel", "sysroot": "/usr/mipsel-linux-gnu", "packages": "libc6-mipsel-cross qemu-user", "musl": "true"},
 		{"arch": "mips64le", "cpu": "mips64el", "gnu": "gnuabi64.2.17", "runner": "ubuntu-24.04", "qemu": "qemu-mips64el", "sysroot": "/usr/mips64el-linux-gnuabi64", "packages": "libc6-mips64el-cross qemu-user", "musl": "false"},
