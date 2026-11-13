@@ -1,17 +1,17 @@
 {
   "abi": 2,
-  "version": "3f7a93a1ed7e",
+  "version": "1b48d8788d3f",
   "target": "android/arm",
   "goarm": "7",
   "purego": false,
   "purego_requires_cgo": true,
-  "source_revision": "3f7a93a1ed7e6f591898ae2b6768a2e0ba20679e",
+  "source_revision": "1b48d8788d3f06deb04750139dad0ee3a2834c1e",
   "lwip_source": {
     "repository": "https://github.com/justinwoo280/lwip.git",
     "revision": "76d269e5196b2e9080e9bf95b9d014c1fc0a8fa0",
     "tree_sha256": "df26cdd0d5e9bca37caf7afedcfc6403eedccc7e71f12a6fa55f59142d4ded12"
   },
-  "native_source_sha256": "065aca5dd2b7aafac3aac079d8a3670de88f08f7a63853012dbfdc2ae4b08641",
+  "native_source_sha256": "70767b4859920c2587b252f69848b4b7872b2e8c5be53549801fffaac362e62b",
   "compiler": "Android (12896553, +pgo, +bolt, +lto, +mlgo, based on r530567c) clang version 19.0.0 (https://android.googlesource.com/toolchain/llvm-project 97a699bf4812a18fb657c2779f5296a4ab2694d2)",
   "files": {
     "LICENSE": "690697ca6c0b42113e59f87d2963d446365a42a07cf08e5bc460569edf2c8a2a",

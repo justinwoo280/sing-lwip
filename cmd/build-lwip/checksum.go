@@ -10,7 +10,8 @@ import (
 // Emit GNU/Clang extended assembly, letting the C compiler manage register
 // allocation and ABI details (ELF, Mach-O, MinGW and clang-cl). Only baseline
 // target features are used: NEON on arm64, SSE2 when enabled by the x86 compiler,
-// ARM32 NEON and s390x VX only when enabled by the target toolchain.
+// ARM32 NEON and s390x VX only when enabled by the target toolchain. Linux Power
+// also carries a POWER9-targeted function behind a cached runtime HWCAP check.
 // The same generated header is consumed by source-CGO and native library builds.
 func checksumHeader() string {
 	var out strings.Builder
@@ -29,13 +30,14 @@ func checksumHeader() string {
 		}
 		fmt.Fprintf(&out, "        %q\n", format+"\n\t")
 	}
+	functionAttribute := ""
 	begin := func(copy bool) {
 		name, destination := "sl_checksum_blocks", ""
 		if copy {
 			out.WriteString("#ifndef SING_LWIP_CHECKSUM_COPY_SEPARATE\n#define SL_CHECKSUM_COPY_BLOCKS 1\n")
 			name, destination = "sl_checksum_copy_blocks", "uint8_t **destination, "
 		}
-		fmt.Fprintf(&out, "static inline uint32_t %s(%sconst uint8_t **data, unsigned blocks) {\n    const uint8_t *p = *data;\n", name, destination)
+		fmt.Fprintf(&out, "static inline %suint32_t %s(%sconst uint8_t **data, unsigned blocks) {\n    const uint8_t *p = *data;\n", functionAttribute, name, destination)
 		if copy {
 			out.WriteString("    uint8_t *d = *destination;\n")
 		}
@@ -145,6 +147,74 @@ func checksumHeader() string {
 		asm("vmov %[sum], s0")
 		end(copy, `"q0", "q1", "q2", "q3", "q8", "q9", "q10", "q11"`)
 	}
+	out.WriteString(`#elif defined(__powerpc64__) && defined(__linux__)
+#define SL_CHECKSUM_BLOCKS "vsx-power9"
+#if defined(_ARCH_PWR9)
+#define SL_POWER9_TARGET
+#else
+#include <sys/auxv.h>
+#if defined(__clang__)
+#define SL_POWER9_TARGET __attribute__((target("power9-vector")))
+#else
+#define SL_POWER9_TARGET __attribute__((target("cpu=power9")))
+#endif
+/* Keep generic builds runnable on POWER8 and earlier. Cache only the CPU
+ * capability, with relaxed atomics so independent stacks may initialize it
+ * concurrently. A missing HWCAP2 entry conservatively selects portable C. */
+static inline int sl_checksum_power9_available(void) {
+    static unsigned cached;
+    unsigned value = __atomic_load_n(&cached, __ATOMIC_RELAXED);
+    if (!value) {
+        /* Linux PPC_FEATURE_HAS_ALTIVEC | PPC_FEATURE_HAS_VSX, and
+         * PPC_FEATURE2_ARCH_3_00 (also present on POWER10). */
+        value = ((getauxval(AT_HWCAP) & 0x10000080UL) == 0x10000080UL &&
+                 (getauxval(AT_HWCAP2) & 0x00800000UL)) ? 2 : 1;
+        __atomic_store_n(&cached, value, __ATOMIC_RELAXED);
+    }
+    return value == 2;
+}
+#define SL_CHECKSUM_AVAILABLE() sl_checksum_power9_available()
+#endif
+/* LXV/STXV preserve native halfwords at arbitrary byte alignments. VMSUMUHM
+ * widens pairs of unsigned halfwords into four word accumulators. Four
+ * independent chains cover each 64-byte block; their complete 64-KiB sum
+ * remains below INT32_MAX, including all-ones input, so VSUMSWS cannot saturate.
+ * Lane order is immaterial to the sum, and stores invert the exact loads. */
+`)
+	pointerConstraint = "b" // Power load/store base register r0 means literal zero.
+	functionAttribute = "SL_POWER9_TARGET "
+	for _, copy := range []bool{false, true} {
+		begin(copy)
+		for i := 0; i < 4; i++ {
+			asm("vxor %d, %d, %d", i, i, i)
+		}
+		asm("vspltish 8, 1")
+		asm("vxor 9, 9, 9")
+		asm("clrldi %[blocks], %[blocks], 32")
+		asm("mtctr %[blocks]")
+		asm("1:")
+		for i := 0; i < 4; i++ {
+			asm("lxv %d, %d(%%[p])", 36+i, i*16)
+		}
+		if copy {
+			for i := 0; i < 4; i++ {
+				asm("stxv %d, %d(%%[d])", 36+i, i*16)
+			}
+			asm("addi %[d], %[d], 64")
+		}
+		for i := 0; i < 4; i++ {
+			asm("vmsumuhm %d, %d, 8, %d", i, i+4, i)
+		}
+		asm("addi %[p], %[p], 64")
+		asm("bdnz 1b")
+		asm("vadduwm 0, 0, 1")
+		asm("vadduwm 2, 2, 3")
+		asm("vadduwm 0, 0, 2")
+		asm("vsumsws 0, 0, 9")
+		asm("mfvsrld %[sum], 32")
+		end(copy, `"v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "ctr"`)
+	}
+	functionAttribute = ""
 	out.WriteString(`#elif defined(__s390x__) && defined(__VX__)
 #define SL_CHECKSUM_BLOCKS "vx-s390x"
 /* z13 Vector Facility: VSUMH widens pairs of unsigned halfwords into words.

@@ -85,6 +85,7 @@ use the same lwIP checksum hook in source-CGO, prebuilt-CGO and PureGo libraries
 | 386 with SSE2 enabled | Generated SSE2 assembly |
 | ARM32 with NEON enabled | Generated NEON assembly |
 | s390x with the Vector Facility enabled (z13+) | Generated VX assembly |
+| Linux 64-bit Power, with POWER9 ISA and VSX available | Generated VSX assembly, runtime-selected for baseline builds |
 | Other targets, including non-NEON ARMv7 | Portable, unaligned-safe C |
 
 The generated header uses C extended assembly so the compiler handles each
@@ -104,7 +105,7 @@ CI and native builders reject stale generated kernels. Native-source provenance
 includes both checksum headers.
 
 Instruction selection follows **target compiler features**, not the build host's
-CPU. Standard ARMv7 builds retain their existing CPU requirements; NEON requires
+CPU, with a runtime capability check for baseline Linux Power builds. Standard ARMv7 builds retain their existing CPU requirements; NEON requires
 an explicit compatible target. s390x selects VX when the compiler defines
 `__VX__`; older targets use portable C. For diagnostic comparisons, define
 `SING_LWIP_CHECKSUM_GENERIC` in `CFLAGS` for native libraries, or `CGO_CFLAGS` for
@@ -269,6 +270,32 @@ the PureGo test executable. Run CGO tests on FreeBSD with `devel/binutils` insta
 
 `CC`, `AR`, `CFLAGS`, `CPPFLAGS` and `LDFLAGS` are supported. The compiler selects the actual libc;
 `--libc gnu|musl` records the Linux artifact variant. The builder verifies the emitted binary's architecture and byte order.
+
+### IBM POWER (ppc64le)
+
+Linux Power builds include a POWER9 VSX kernel for checksum and fused
+copy/checksum. Baseline builds check Linux HWCAP for AltiVec, VSX and ISA 3.0,
+then cache the result with relaxed atomics. POWER8 retains portable C; POWER9
+and POWER10 use the optimized kernel. Only the kernel functions are compiled
+for POWER9, so published baseline libraries do not require POWER9 globally.
+An explicit `-mcpu=power9` (or newer) build can inline the kernel and retains
+that compiler target's CPU requirement.
+
+`LXV`/`STXV` handle unaligned full blocks, and `VMSUMUHM` widens unsigned
+halfwords into four independent accumulator chains. The bounded 64-KiB sum
+fits below `INT32_MAX`, making the final `VSUMSWS` reduction exact. Short and
+odd tails use the portable implementation. Generated instructions operate in
+native word order and are checked against byte-wise oracles in both endian
+orders. The publication matrix remains ppc64le; big-endian checks exercise the
+C kernels without introducing a new Go/PureGo platform.
+
+Native POWER10 validation covers GCC and Clang, CGO/PureGo stack regressions,
+guard pages and ASan/UBSan. CI additionally runs baseline binaries under
+POWER8 and POWER9 emulation, including forced-generic and separate-copy
+variants, for little- and big-endian C kernels.
+
+See [POWER checksum measurements](POWER_CHECKSUM.md) for the standalone
+benchmark, PMU results and the evaluated POWER10 paired-load alternative.
 
 ### IBM Z / LinuxONE (s390x)
 

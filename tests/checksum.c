@@ -180,10 +180,20 @@ static void copy_guards(void) {
 #endif
 }
 int main(void) {
+    int vector = 0;
+#ifdef SL_CHECKSUM_BLOCKS
+    vector = !!SL_CHECKSUM_AVAILABLE();
+#endif
+    const char *expected = getenv("SING_LWIP_TEST_VECTOR");
+    if (expected) {
+        assert(!strcmp(expected,"0") || !strcmp(expected,"1"));
+        assert(vector == (expected[0] == '1'));
+    }
     boundaries(); guard_pages(); chained(); copy_cases(); copy_guards();
     puts("checksum copy: source/destination alignments, contents, canaries and guards PASS");
 #ifdef SL_CHECKSUM_BLOCKS
-    puts("checksum " SL_CHECKSUM_BLOCKS ": oracle, alignments, overflow, guards, IPv4/IPv6 pbuf chains PASS");
+    printf("checksum %s: oracle, alignments, overflow, guards, IPv4/IPv6 pbuf chains PASS\n",
+           SL_CHECKSUM_AVAILABLE() ? SL_CHECKSUM_BLOCKS : "scalar (runtime fallback)");
 #else
     puts("checksum scalar: oracle, alignments, overflow, guards, IPv4/IPv6 pbuf chains PASS");
 #endif

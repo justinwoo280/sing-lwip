@@ -91,6 +91,49 @@ jobs:
           SING_LWIP_ABI_FIXTURE="$PWD/dist/compat/abi-fixture.so" \
             qemu-arm -L /usr/arm-linux-gnueabihf dist/compat/purego.test -test.v
 
+  power-kernels:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        cpu: [powerpc64le, powerpc64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go
+        with:
+          target: power-kernels-${{ matrix.cpu }}
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: '0.15.2'
+          cache-key: lwip-power-kernels-${{ matrix.cpu }}
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-user
+      - name: Check both endian orders, runtime dispatch and diagnostic kernels
+        env:
+          TARGET_CPU: ${{ matrix.cpu }}
+        run: |
+          go run ./cmd/build-lwip sync-lwip
+          runner=qemu-ppc64
+          if [ "$TARGET_CPU" = powerpc64le ]; then runner=qemu-ppc64le; fi
+          for mode in runtime generic separate; do
+            flags=()
+            if [ "$mode" = generic ]; then flags+=(-DSING_LWIP_CHECKSUM_GENERIC); fi
+            if [ "$mode" = separate ]; then flags+=(-DSING_LWIP_CHECKSUM_COPY_SEPARATE); fi
+            binary="$RUNNER_TEMP/checksum-$mode"
+            zig cc -target "$TARGET_CPU-linux-musl" -mcpu=pwr8 -O3 -Werror \
+              -DSING_LWIP_STANDALONE "${flags[@]}" \
+              -I. -Ithird_party/lwip/src/include -Ithird_party/lwip/src/ports/include \
+              tests/checksum.c lwip_*.c -static -o "$binary"
+            SING_LWIP_TEST_VECTOR=0 "$runner" -cpu power8 "$binary"
+            expected=1
+            if [ "$mode" = generic ]; then expected=0; fi
+            SING_LWIP_TEST_VECTOR="$expected" "$runner" -cpu power9 "$binary"
+          done
+
   linux:
     needs: plan
     strategy:
@@ -158,6 +201,21 @@ jobs:
               SING_LWIP_LIBRARY="$PWD/$out/libsing-lwip.so" \
               SING_LWIP_ABI_FIXTURE="$PWD/$out/abi-fixture.so" \
               "${runner[@]}" "$out/purego.test" -test.v
+            fi
+          done
+      - name: Check POWER9 bindings with baseline release artifacts
+        if: matrix.arch == 'ppc64le'
+        run: |
+          for libc in gnu musl; do
+            out="dist/linux_ppc64le_$libc"
+            runner=(qemu-ppc64le -cpu power9)
+            if [ "$libc" = gnu ]; then runner+=(-L /usr/powerpc64le-linux-gnu); fi
+            SING_LWIP_TEST_VECTOR=1 "${runner[@]}" "$out/checksum.test"
+            "${runner[@]}" "$out/cgo.test" -test.v
+            if [ -f "$out/purego.test" ]; then
+              SING_LWIP_LIBRARY="$PWD/$out/libsing-lwip.so" \
+              SING_LWIP_ABI_FIXTURE="$PWD/$out/abi-fixture.so" \
+                "${runner[@]}" "$out/purego.test" -test.v
             fi
           done
       - name: Check s390x vector and diagnostic kernels
@@ -399,7 +457,7 @@ jobs:
           retention-days: 7
 
   publish:
-    needs: [plan, go-compat, linux, windows-build, windows-test, apple, android, freebsd]
+    needs: [plan, go-compat, power-kernels, linux, windows-build, windows-test, apple, android, freebsd]
     if: github.event_name != 'pull_request' && (github.ref_name == 'main' || github.ref_name == 'dev')
     runs-on: ubuntu-24.04
     permissions:
