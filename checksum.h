@@ -7,6 +7,10 @@
 #include <string.h>
 #include "checksum_generated.h"
 
+#ifndef SL_CHECKSUM_AVAILABLE
+#define SL_CHECKSUM_AVAILABLE() 1
+#endif
+
 /* Keep each chunk <= 65536 bytes: even all-ones input sums to < 2^31.
  * memcpy permits unaligned input without violating C effective-type rules. */
 static inline uint32_t sl_checksum_scalar(const uint8_t *p, unsigned n) {
@@ -34,12 +38,20 @@ static inline uint32_t sl_checksum_scalar(const uint8_t *p, unsigned n) {
 
 static inline uint16_t sl_checksum(const void *data, int length) {
     const uint8_t *p = (const uint8_t *)data;
+#ifdef SL_POWER9_TARGET
+    /* Keep small IP/transport headers out of the out-of-line VSX call path. */
+    if (length > 0 && length < 64) {
+        uint32_t short_sum = sl_checksum_scalar(p, (unsigned)length);
+        short_sum = (short_sum & 65535) + (short_sum >> 16);
+        return (uint16_t)((short_sum & 65535) + (short_sum >> 16));
+    }
+#endif
     uint32_t sum = 0;
     while (length > 0) {
         unsigned n = length > 65536 ? 65536 : (unsigned)length;
         length -= (int)n;
 #ifdef SL_CHECKSUM_BLOCKS
-        if (n >= 64) {
+        if (n >= 64 && SL_CHECKSUM_AVAILABLE()) {
             sum += sl_checksum_blocks(&p, n / 64);
             n %= 64;
         }
@@ -57,6 +69,10 @@ static inline uint16_t sl_checksum(const void *data, int length) {
 static inline uint16_t sl_checksum_copy_impl(void *destination, const void *source, uint16_t length) {
     if (!length) return 0;
 #ifdef SL_CHECKSUM_COPY_BLOCKS
+    if (length >= 64 && !SL_CHECKSUM_AVAILABLE()) {
+        memcpy(destination, source, length);
+        return sl_checksum(destination, length);
+    }
     const uint8_t *p = (const uint8_t *)source;
     uint8_t *d = (uint8_t *)destination;
     unsigned n = length;

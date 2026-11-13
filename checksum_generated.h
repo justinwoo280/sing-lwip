@@ -250,6 +250,117 @@ static inline uint32_t sl_checksum_copy_blocks(uint8_t **destination, const uint
     return sum;
 }
 #endif
+#elif defined(__powerpc64__) && defined(__linux__)
+#define SL_CHECKSUM_BLOCKS "vsx-power9"
+#if defined(_ARCH_PWR9)
+#define SL_POWER9_TARGET
+#else
+#include <sys/auxv.h>
+#if defined(__clang__)
+#define SL_POWER9_TARGET __attribute__((target("power9-vector")))
+#else
+#define SL_POWER9_TARGET __attribute__((target("cpu=power9")))
+#endif
+/* Keep generic builds runnable on POWER8 and earlier. Cache only the CPU
+ * capability, with relaxed atomics so independent stacks may initialize it
+ * concurrently. A missing HWCAP2 entry conservatively selects portable C. */
+static inline int sl_checksum_power9_available(void) {
+    static unsigned cached;
+    unsigned value = __atomic_load_n(&cached, __ATOMIC_RELAXED);
+    if (!value) {
+        /* Linux PPC_FEATURE_HAS_ALTIVEC | PPC_FEATURE_HAS_VSX, and
+         * PPC_FEATURE2_ARCH_3_00 (also present on POWER10). */
+        value = ((getauxval(AT_HWCAP) & 0x10000080UL) == 0x10000080UL &&
+                 (getauxval(AT_HWCAP2) & 0x00800000UL)) ? 2 : 1;
+        __atomic_store_n(&cached, value, __ATOMIC_RELAXED);
+    }
+    return value == 2;
+}
+#define SL_CHECKSUM_AVAILABLE() sl_checksum_power9_available()
+#endif
+/* LXV/STXV preserve native halfwords at arbitrary byte alignments. VMSUMUHM
+ * widens pairs of unsigned halfwords into four word accumulators. Four
+ * independent chains cover each 64-byte block; their complete 64-KiB sum
+ * remains below INT32_MAX, including all-ones input, so VSUMSWS cannot saturate.
+ * Lane order is immaterial to the sum, and stores invert the exact loads. */
+static inline SL_POWER9_TARGET uint32_t sl_checksum_blocks(const uint8_t **data, unsigned blocks) {
+    const uint8_t *p = *data;
+    uint32_t sum;
+    __asm__ (
+        "vxor 0, 0, 0\n\t"
+        "vxor 1, 1, 1\n\t"
+        "vxor 2, 2, 2\n\t"
+        "vxor 3, 3, 3\n\t"
+        "vspltish 8, 1\n\t"
+        "vxor 9, 9, 9\n\t"
+        "clrldi %[blocks], %[blocks], 32\n\t"
+        "mtctr %[blocks]\n\t"
+        "1:\n\t"
+        "lxv 36, 0(%[p])\n\t"
+        "lxv 37, 16(%[p])\n\t"
+        "lxv 38, 32(%[p])\n\t"
+        "lxv 39, 48(%[p])\n\t"
+        "vmsumuhm 0, 4, 8, 0\n\t"
+        "vmsumuhm 1, 5, 8, 1\n\t"
+        "vmsumuhm 2, 6, 8, 2\n\t"
+        "vmsumuhm 3, 7, 8, 3\n\t"
+        "addi %[p], %[p], 64\n\t"
+        "bdnz 1b\n\t"
+        "vadduwm 0, 0, 1\n\t"
+        "vadduwm 2, 2, 3\n\t"
+        "vadduwm 0, 0, 2\n\t"
+        "vsumsws 0, 0, 9\n\t"
+        "mfvsrld %[sum], 32\n\t"
+        : [p] "+&b" (p), [blocks] "+&r" (blocks), [sum] "=r" (sum)
+        :
+        : "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "ctr", "cc", "memory");
+    *data = p;
+    return sum;
+}
+#ifndef SING_LWIP_CHECKSUM_COPY_SEPARATE
+#define SL_CHECKSUM_COPY_BLOCKS 1
+static inline SL_POWER9_TARGET uint32_t sl_checksum_copy_blocks(uint8_t **destination, const uint8_t **data, unsigned blocks) {
+    const uint8_t *p = *data;
+    uint8_t *d = *destination;
+    uint32_t sum;
+    __asm__ (
+        "vxor 0, 0, 0\n\t"
+        "vxor 1, 1, 1\n\t"
+        "vxor 2, 2, 2\n\t"
+        "vxor 3, 3, 3\n\t"
+        "vspltish 8, 1\n\t"
+        "vxor 9, 9, 9\n\t"
+        "clrldi %[blocks], %[blocks], 32\n\t"
+        "mtctr %[blocks]\n\t"
+        "1:\n\t"
+        "lxv 36, 0(%[p])\n\t"
+        "lxv 37, 16(%[p])\n\t"
+        "lxv 38, 32(%[p])\n\t"
+        "lxv 39, 48(%[p])\n\t"
+        "stxv 36, 0(%[d])\n\t"
+        "stxv 37, 16(%[d])\n\t"
+        "stxv 38, 32(%[d])\n\t"
+        "stxv 39, 48(%[d])\n\t"
+        "addi %[d], %[d], 64\n\t"
+        "vmsumuhm 0, 4, 8, 0\n\t"
+        "vmsumuhm 1, 5, 8, 1\n\t"
+        "vmsumuhm 2, 6, 8, 2\n\t"
+        "vmsumuhm 3, 7, 8, 3\n\t"
+        "addi %[p], %[p], 64\n\t"
+        "bdnz 1b\n\t"
+        "vadduwm 0, 0, 1\n\t"
+        "vadduwm 2, 2, 3\n\t"
+        "vadduwm 0, 0, 2\n\t"
+        "vsumsws 0, 0, 9\n\t"
+        "mfvsrld %[sum], 32\n\t"
+        : [p] "+&b" (p), [blocks] "+&r" (blocks), [sum] "=r" (sum), [d] "+&b" (d)
+        :
+        : "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "ctr", "cc", "memory");
+    *data = p;
+    *destination = d;
+    return sum;
+}
+#endif
 #elif defined(__s390x__) && defined(__VX__)
 #define SL_CHECKSUM_BLOCKS "vx-s390x"
 /* z13 Vector Facility: VSUMH widens pairs of unsigned halfwords into words.
