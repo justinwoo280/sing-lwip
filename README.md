@@ -289,13 +289,15 @@ native word order and are checked against byte-wise oracles in both endian
 orders. The publication matrix remains ppc64le; big-endian checks exercise the
 C kernels without introducing a new Go/PureGo platform.
 
-Native POWER10 validation covers GCC and Clang, CGO/PureGo stack regressions,
-guard pages and ASan/UBSan. CI additionally runs baseline binaries under
-POWER8 and POWER9 emulation, including forced-generic and separate-copy
+POWER10 validation on a shared virtualized instance at the Oregon State
+University Open Source Lab (OSL) covers GCC and Clang, CGO/PureGo stack
+regressions, guard pages and ASan/UBSan. CI additionally runs baseline binaries
+under POWER8 and POWER9 emulation, including forced-generic and separate-copy
 variants, for little- and big-endian C kernels.
 
-See [POWER checksum measurements](POWER_CHECKSUM.md) for the standalone
-benchmark, PMU results and the evaluated POWER10 paired-load alternative.
+See [POWER checksum measurements](POWER_CHECKSUM.md) for results from that
+shared virtualized instance at OSL: standalone microbenchmark timings, PMU
+counts and the evaluated POWER10 paired-load alternative.
 
 ### IBM Z / LinuxONE (s390x)
 

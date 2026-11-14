@@ -1,5 +1,11 @@
 # POWER checksum kernels and measurements
 
+**Measurement provenance:** All POWER10 performance numbers in this report,
+including timings, speedups, hardware-counter totals and prototype comparisons,
+come from runs on a **shared virtualized instance at the Oregon State University
+Open Source Lab (OSL)**. Retain this attribution when quoting or summarizing the
+results, including in upstream PR and issue comments.
+
 ## Implementation
 
 `cmd/build-lwip/checksum.go` generates the VSX kernels in
@@ -43,15 +49,18 @@ from its internal timer. Compare interleaved runs rather than running one
 variant's entire measurement series first. `SING_LWIP_CHECKSUM_COPY_SEPARATE`
 provides a third variant: optimized checksum with a separate libc copy.
 
-## Native POWER10 observations
+## POWER10 observations on the OSL shared virtualized instance
 
-Measured on an OpenStack/KVM POWER10 guest with four vCPUs, Ubuntu 24.04,
-GCC 13.3 and Clang 18.1. Both variants used `-O3 -mcpu=power8`, allowing the
-compiler to optimize the portable baseline. The optimized variant used runtime
-dispatch. Processes were pinned to guest vCPU 2; this is not host CPU isolation.
+Measured on a shared OpenStack/KVM POWER10 instance at OSL with four vCPUs,
+8 GB RAM, Ubuntu 24.04, GCC 13.3 and Clang 18.1. Both variants used
+`-O3 -mcpu=power8`, allowing the compiler to optimize the portable baseline.
+The optimized variant used runtime dispatch. Processes were pinned to guest
+vCPU 2; this is not host CPU isolation. Shared-host scheduling and contention
+can affect the measurements.
 
-The following are medians of seven interleaved runs. Source/destination offsets
-were 1 and 3 bytes. Values are kernel timings, not whole-stack throughput.
+The following are medians of seven interleaved runs on the shared virtualized
+POWER10 instance at OSL. Source/destination offsets were 1 and 3 bytes. Values
+are kernel timings, not whole-stack throughput.
 
 | Compiler | Operation | Bytes | Portable ns/call | VSX ns/call | Speedup |
 |---|---|---:|---:|---:|---:|
@@ -70,9 +79,10 @@ were 1 and 3 bytes. Values are kernel timings, not whole-stack throughput.
 | Clang | checksum | 65535 | 2929.14 | 1608.82 | 1.82x |
 | Clang | copy + checksum | 65535 | 3843.48 | 1623.48 | 2.37x |
 
-For 5,000,000 calls at 1500 bytes, paired cycles/instructions events ran 100%
-of the measured interval. Five-run `perf stat` totals (including startup and
-the benchmark harness) corroborated reduced work:
+On the same shared virtualized POWER10 instance at OSL, for 5,000,000 calls at
+1500 bytes, paired cycles/instructions events ran 100% of the measured interval.
+Five-run `perf stat` totals (including startup and the benchmark harness)
+corroborated reduced work:
 
 | Compiler / operation | Portable instructions | VSX instructions | Portable cycles | VSX cycles |
 |---|---:|---:|---:|---:|
@@ -89,9 +99,10 @@ crossings, scheduling, packet I/O and the rest of TCP/IP.
 ## POWER10-specific experiment
 
 A separate prototype replaced four `LXV`/`STXV` operations with two
-`LXVP`/`STXVP` pairs. GCC and Clang correctness/guard tests passed, but native
-POWER10 measurements did not show a consistent benefit. Some small aligned
-cases improved while unaligned 1500-byte fused copies were about 10% slower.
+`LXVP`/`STXVP` pairs. GCC and Clang correctness/guard tests passed, but
+measurements on the same shared virtualized POWER10 instance at OSL did not
+show a consistent benefit. In those shared-VM runs, some small aligned cases
+improved while unaligned 1500-byte fused copies were about 10% slower.
 The shipped kernel therefore uses the POWER9 instruction sequence on POWER10
 as well; a separate POWER10 branch would require a demonstrated improvement.
 
@@ -103,8 +114,9 @@ patterns, 64-KiB chunk boundaries, read-only source and guard pages, and real
 IPv4/IPv6 pbuf-chain/pseudo-header sums. Optional `SING_LWIP_TEST_VECTOR=0|1`
 asserts runtime dispatch before running the suite.
 
-Native POWER10 GCC/Clang builds pass these checks and the CGO/PureGo TCP, UDP,
-GSO, reassembly and lifecycle suites. GCC ASan/UBSan and Go race tests pass.
+POWER10 GCC/Clang builds on OSL's shared virtualized instance pass these checks
+and the CGO/PureGo TCP, UDP, GSO, reassembly and lifecycle suites.
+GCC ASan/UBSan and Go race tests pass on that instance.
 LinuxONE native VX and protocol-stack/sanitizer regressions also pass.
 Zig 0.15.2 builds of both little- and big-endian C fixtures pass under QEMU
 POWER8 (portable fallback) and POWER9 (VSX). Big-endian emulation is a
